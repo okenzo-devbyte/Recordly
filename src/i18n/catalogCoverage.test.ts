@@ -6,7 +6,7 @@ const dynamicKeys = [
 	...["fast", "balanced", "quality"].map((key) => `settings.export.encoding.${key}`),
 	"settings.export.customWidth",
 	"settings.export.customHeight",
-	...["auto", "en", "es", "fr", "de", "it", "pt", "zh", "ja", "ko"].map(
+	...["auto", "en", "es", "fr", "de", "it", "pt", "zh", "ja", "ko", "th"].map(
 		(key) => `editing.captionLanguage${key}`,
 	),
 	...["none", "fade", "rise", "pop"].map((key) => `editing.captionAnimation${key}`),

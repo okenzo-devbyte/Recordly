@@ -28,6 +28,7 @@ async function fixture() {
 		"src/assets/cursors/community",
 		"src/assets/cursors/pixel-glove",
 		"src/assets/fonts/dm-sans",
+		"src/assets/fonts/noto-sans-thai",
 		"src/assets/fonts/tiktok-sans",
 		"src/assets/liquid-glass",
 	]) {
@@ -155,6 +156,7 @@ describe("desktop distribution notices", () => {
 			],
 			["src/assets/cursors/pixel-glove/arrow.svg", "assets/cursors/pixel-glove/arrow.svg"],
 			["src/assets/fonts/dm-sans/OFL.txt", "assets/fonts/dm-sans/OFL.txt"],
+			["src/assets/fonts/noto-sans-thai/OFL.txt", "assets/fonts/noto-sans-thai/OFL.txt"],
 			["src/assets/fonts/tiktok-sans/OFL.txt", "assets/fonts/tiktok-sans/OFL.txt"],
 			[
 				"build/legal/onnxruntime/ThirdPartyNotices.txt",

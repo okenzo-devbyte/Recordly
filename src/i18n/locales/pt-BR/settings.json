@@ -598,5 +598,40 @@
 	},
 	"annotation": {
 		"delete": "Excluir anotação"
+	},
+	"performance": {
+		"title": "Desempenho",
+		"hardwareSummary": "{{cores}} núcleos · {{memory}} GB RAM · {{encoder}}",
+		"hwEncoderReady": "Encoder por GPU pronto",
+		"cpuEncoderOnly": "Fallback em CPU",
+		"recommendedLabel": "Recomendado: {{tier}}",
+		"mode": "Modo de desempenho",
+		"modeDescription": "Ajusta automaticamente o uso de recursos na gravação, pré-visualização e exportação ou fixa um perfil.",
+		"modes": {
+			"auto": "Automático ({{tier}})",
+			"low": "Eco (PC leve)",
+			"balanced": "Equilibrado",
+			"high": "Alta qualidade"
+		},
+		"tiers": {
+			"low": "Eco",
+			"balanced": "Equilibrado",
+			"high": "Alto"
+		},
+		"captureResolution": "Resolução de captura",
+		"captureResolutionDescription": "Limita a resolução da gravação de tela para reduzir uso de CPU, memória e disco em PCs leves.",
+		"resolutions": {
+			"auto": "Automático",
+			"1080p": "1080p",
+			"native": "Nativa"
+		},
+		"captureFps": "FPS de captura",
+		"captureFpsDescription": "Use 30 FPS para multitarefa fluida em máquinas de 4–8 núcleos ou 60 FPS para clareza máxima de movimento.",
+		"fpsOptions": {
+			"auto": "Automático",
+			"30": "30 FPS",
+			"60": "60 FPS"
+		},
+		"saveFailed": "Não foi possível salvar as configurações de desempenho."
 	}
 }

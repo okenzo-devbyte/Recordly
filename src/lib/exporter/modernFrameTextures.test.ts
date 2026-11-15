@@ -196,6 +196,35 @@ describe("ModernFrameRenderer webcam frame cache", () => {
 		);
 	});
 
+	it("uploads scene and background VideoFrames directly on WebGL without 2D canvas staging", async () => {
+		const renderer = createRenderer();
+		renderer.scene.rendererBackend = "webgl";
+
+		const frame = {
+			displayWidth: 1920,
+			displayHeight: 1080,
+			timestamp: 1000,
+		} as VideoFrame;
+
+		const detachedScene = await renderer.textures.resolveDetachedVideoFrameSource(
+			frame,
+			"scene",
+			1920,
+			1080,
+		);
+		const stagedBackground = renderer.textures.stageVideoFrameForTexture(
+			frame,
+			"background",
+			1920,
+			1080,
+		);
+
+		expect(detachedScene).toBe(frame);
+		expect(stagedBackground).toBe(frame);
+		expect(renderer.textures.sceneVideoFrameStagingCanvas).toBeNull();
+		expect(renderer.textures.backgroundVideoFrameStagingCanvas).toBeNull();
+	});
+
 	it("uses staging canvas instead of recursing when WebGPU frame retention fails", () => {
 		const renderer = createRenderer();
 		const originalVideoFrame = globalThis.VideoFrame;

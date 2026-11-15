@@ -598,5 +598,40 @@
 	},
 	"annotation": {
 		"delete": "刪除註釋"
+	},
+	"performance": {
+		"title": "效能",
+		"hardwareSummary": "{{cores}} 核心 · {{memory}} GB 記憶體 · {{encoder}}",
+		"hwEncoderReady": "支援硬體編碼",
+		"cpuEncoderOnly": "使用 CPU 編碼",
+		"recommendedLabel": "建議：{{tier}}",
+		"mode": "效能模式",
+		"modeDescription": "自動調整錄製、預覽與匯出時的資源使用，或鎖定品質預設。",
+		"modes": {
+			"auto": "自動 ({{tier}})",
+			"low": "節能（低規）",
+			"balanced": "均衡",
+			"high": "高畫質"
+		},
+		"tiers": {
+			"low": "節能",
+			"balanced": "均衡",
+			"high": "高"
+		},
+		"captureResolution": "錄製解析度",
+		"captureResolutionDescription": "限制螢幕錄製解析度以降低輕量電腦上的 CPU、記憶體與磁碟負擔。",
+		"resolutions": {
+			"auto": "自動",
+			"1080p": "1080p",
+			"native": "原生"
+		},
+		"captureFps": "錄製幀率",
+		"captureFpsDescription": "4–8 核心裝置可使用 30 FPS 保持流暢多工，或選擇 60 FPS 獲得最高動態清晰度。",
+		"fpsOptions": {
+			"auto": "自動",
+			"30": "30 FPS",
+			"60": "60 FPS"
+		},
+		"saveFailed": "無法儲存效能設定。"
 	}
 }

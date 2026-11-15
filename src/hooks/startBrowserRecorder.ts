@@ -1,5 +1,6 @@
 import { toast } from "@/components/ui/toast";
 import { translate } from "@/i18n/runtime";
+import { ensurePerformanceProfileLoaded } from "@/lib/performanceProfileStore";
 import {
 	AUDIO_BITRATE_SYSTEM,
 	AUDIO_BITRATE_VOICE,
@@ -11,7 +12,6 @@ import {
 	DEFAULT_WIDTH,
 	RECORDER_TIMESLICE_MS,
 	RECORDING_FILE_PREFIX,
-	TARGET_FRAME_RATE,
 } from "./recorderCaptureOptions";
 import type { RecorderContext } from "./recorderContext";
 import { RecordingFileWriter } from "./recordingFileWriter";
@@ -73,20 +73,22 @@ export async function startBrowserRecorder(
 		webcamStartTime,
 	} = context;
 
+	const budget = await ensurePerformanceProfileLoaded();
+
 	let {
 		width = DEFAULT_WIDTH,
 		height = DEFAULT_HEIGHT,
-		frameRate = TARGET_FRAME_RATE,
+		frameRate = budget.recording.fps,
 	} = videoTrack.getSettings();
 
 	width = Math.floor(width / CODEC_ALIGNMENT) * CODEC_ALIGNMENT;
 	height = Math.floor(height / CODEC_ALIGNMENT) * CODEC_ALIGNMENT;
 
-	const videoBitsPerSecond = computeBitrate(width, height);
+	const videoBitsPerSecond = computeBitrate(width, height, budget);
 	const mimeType = selectMimeType();
 
 	console.log(
-		`Recording at ${width}x${height} @ ${frameRate ?? TARGET_FRAME_RATE}fps using ${mimeType ?? "browser default"} / ${Math.round(
+		`Recording at ${width}x${height} @ ${frameRate ?? budget.recording.fps}fps using ${mimeType ?? "browser default"} / ${Math.round(
 			videoBitsPerSecond / BITS_PER_MEGABIT,
 		)} Mbps`,
 	);
@@ -218,7 +220,7 @@ export async function startBrowserRecorder(
 	resetRecordingClock(mainStartedAt);
 	webcamTimeOffsetMs.current =
 		webcamStartTime.current === null ? 0 : webcamStartTime.current - mainStartedAt;
-	recorder.start(RECORDER_TIMESLICE_MS);
+	recorder.start(budget.recording.timesliceMs || RECORDER_TIMESLICE_MS);
 	setRecording(true);
 	try {
 		await window.electronAPI?.setRecordingState(true);

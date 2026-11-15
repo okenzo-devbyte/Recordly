@@ -1,6 +1,7 @@
 import { Skeleton } from "@heroui/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ImageSquare } from "@/components/ui/icons";
+import { usePerformanceBudget } from "@/lib/performanceProfileStore";
 import { PROJECT_THUMBNAIL_RENDER_VERSION } from "@/lib/projectThumbnail";
 import type { ProjectPreviewData } from "@/types/projectPreview";
 import { normalizeProjectEditor } from "../projectPersistence";
@@ -24,6 +25,8 @@ export function ProjectThumbnail({
 	revision?: number;
 	videoSource?: string;
 }) {
+	const performanceBudget = usePerformanceBudget();
+	const allowHoverPreview = previewActive && performanceBudget.preview.allowHoverVideoPreview;
 	const [loadedSource, setLoadedSource] = useState<string | null>(null);
 	const [failedSource, setFailedSource] = useState<string | null>(null);
 	const [visible, setVisible] = useState(false);
@@ -107,7 +110,7 @@ export function ProjectThumbnail({
 	const finish = useCallback(() => setPreview(null), []);
 	useEffect(() => {
 		if (
-			!previewActive ||
+			!allowHoverPreview ||
 			!projectPath ||
 			window.matchMedia("(prefers-reduced-motion: reduce)").matches
 		)
@@ -129,7 +132,7 @@ export function ProjectThumbnail({
 			observer.disconnect();
 			setPreview(null);
 		};
-	}, [previewActive, projectPath, metadata]);
+	}, [allowHoverPreview, projectPath, metadata]);
 	useEffect(() => {
 		if (!host.current) return;
 		const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), {
@@ -205,7 +208,7 @@ export function ProjectThumbnail({
 				(projectPath || videoSource) ? null : (
 				<ImageSquare weight="fill" className="size-8 text-muted-foreground/20" />
 			)}
-			{previewActive && preview && preview === metadata && (
+			{allowHoverPreview && preview && preview === metadata && (
 				<ProjectHoverPreview key={cacheKey} data={preview} onFinish={finish} />
 			)}
 			{visible &&

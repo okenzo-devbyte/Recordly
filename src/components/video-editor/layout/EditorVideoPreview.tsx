@@ -2,6 +2,7 @@ import type { ComponentProps, Dispatch, RefObject, SetStateAction } from "react"
 import type { AspectRatio } from "@/utils/aspectRatioUtils";
 import type { useVideoEditorAudio } from "../audio/useVideoEditorAudio";
 import type { useAppearanceState } from "../state/useAppearanceState";
+import type { PlaybackClockStore } from "../state/playbackClockStore";
 import type { useTimelineState } from "../state/useTimelineState";
 import type { CursorTelemetryPoint, ZoomRegion } from "../types";
 import VideoPlayback, { type VideoPlaybackRef } from "../VideoPlayback";
@@ -24,7 +25,8 @@ type Props = {
 	previewVersion: number;
 	aspectRatio: AspectRatio;
 	playbackRef: RefObject<VideoPlaybackRef | null>;
-	currentTime: number;
+	playbackClock?: PlaybackClockStore;
+	currentTime?: number;
 	isPlaying: boolean;
 	previewVolume: number;
 	suspendRendering: boolean;
@@ -36,7 +38,7 @@ type Props = {
 	effectiveShowCursor: boolean;
 	setDuration: Dispatch<SetStateAction<number>>;
 	setIsPreviewReady: Dispatch<SetStateAction<boolean>>;
-	setCurrentTime: Dispatch<SetStateAction<number>>;
+	setCurrentTime?: Dispatch<SetStateAction<number>>;
 	setIsPlaying: Dispatch<SetStateAction<boolean>>;
 	setError: (message: string | null) => void;
 	handlers: Handlers;
@@ -47,6 +49,7 @@ export function EditorVideoPreview({
 	previewVersion,
 	aspectRatio,
 	playbackRef,
+	playbackClock,
 	currentTime,
 	isPlaying,
 	previewVolume,
@@ -73,8 +76,9 @@ export function EditorVideoPreview({
 			videoPath={videoPath || ""}
 			onDurationChange={setDuration}
 			onPreviewReadyChange={setIsPreviewReady}
-			onTimeUpdate={setCurrentTime}
-			currentTime={currentTime}
+			playbackClock={playbackClock}
+			onTimeUpdate={playbackClock ? undefined : setCurrentTime}
+			currentTime={playbackClock ? undefined : currentTime}
 			onPlayStateChange={setIsPlaying}
 			onError={setError}
 			wallpaper={appearance.wallpaper}

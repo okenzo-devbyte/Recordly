@@ -598,5 +598,40 @@
 	},
 	"annotation": {
 		"delete": "删除注释"
+	},
+	"performance": {
+		"title": "性能",
+		"hardwareSummary": "{{cores}} 核 · {{memory}} GB 内存 · {{encoder}}",
+		"hwEncoderReady": "支持硬件编码",
+		"cpuEncoderOnly": "使用 CPU 编码",
+		"recommendedLabel": "推荐：{{tier}}",
+		"mode": "性能模式",
+		"modeDescription": "自动调节录制、预览和导出时的资源占用，或锁定指定画质预设。",
+		"modes": {
+			"auto": "自动 ({{tier}})",
+			"low": "节能（低配）",
+			"balanced": "均衡",
+			"high": "高质量"
+		},
+		"tiers": {
+			"low": "节能",
+			"balanced": "均衡",
+			"high": "高"
+		},
+		"captureResolution": "录制分辨率",
+		"captureResolutionDescription": "限制录屏分辨率以降低轻量电脑上的 CPU、内存和磁盘占用。",
+		"resolutions": {
+			"auto": "自动",
+			"1080p": "1080p",
+			"native": "原生"
+		},
+		"captureFps": "录制帧率",
+		"captureFpsDescription": "4–8 核设备推荐使用 30 FPS 保持多任务流畅，或选择 60 FPS 获取最高动态清晰度。",
+		"fpsOptions": {
+			"auto": "自动",
+			"30": "30 FPS",
+			"60": "60 FPS"
+		},
+		"saveFailed": "无法保存性能设置。"
 	}
 }

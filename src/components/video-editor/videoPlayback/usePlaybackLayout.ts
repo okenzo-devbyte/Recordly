@@ -1,6 +1,7 @@
 import { Rectangle } from "pixi.js";
 import { useCallback, useEffect, useMemo } from "react";
 import { enablePitchPreservingPlayback } from "@/lib/mediaTiming";
+import { usePerformanceBudget } from "@/lib/performanceProfileStore";
 import { type ZoomDepth, type ZoomFocus, type ZoomRegion } from "../types";
 import { clampFocusToStage as clampFocusToStageUtil } from "./focusUtils";
 import { layoutVideoContent as layoutVideoContentUtil } from "./layoutUtils";
@@ -19,6 +20,7 @@ export type usePlaybackLayoutInput = Pick<
 	| "isPlayingRef"
 	| "appRef"
 	| "videoEffectsContainerRef"
+	| "previewShadowControllerRef"
 	| "zoomBlurFilterRef"
 	| "motionBlurFilterRef"
 	| "cursorOverlayRef"
@@ -45,6 +47,10 @@ export type usePlaybackLayoutInput = Pick<
 	| "borderRadius"
 	| "padding"
 	| "volume"
+	| "showShadow"
+	| "shadowIntensity"
+	| "pixiReady"
+	| "videoReady"
 	| "layoutVideoContentRef"
 	| "selectedZoomId"
 	| "zoomRegions"
@@ -58,6 +64,7 @@ export function usePlaybackLayout(input: usePlaybackLayoutInput) {
 		isPlayingRef,
 		appRef,
 		videoEffectsContainerRef,
+		previewShadowControllerRef,
 		zoomBlurFilterRef,
 		motionBlurFilterRef,
 		cursorOverlayRef,
@@ -84,10 +91,16 @@ export function usePlaybackLayout(input: usePlaybackLayoutInput) {
 		borderRadius,
 		padding,
 		volume,
+		showShadow,
+		shadowIntensity,
+		pixiReady,
+		videoReady,
 		layoutVideoContentRef,
 		selectedZoomId,
 		zoomRegions,
 	} = input;
+	const budget = usePerformanceBudget();
+	const useCachedPixiShadows = !budget.preview.allowCssDropShadow;
 
 	const clampFocusToStage = useCallback(
 		(focus: ZoomFocus, depth: ZoomDepth) => {
@@ -152,6 +165,29 @@ export function usePlaybackLayout(input: usePlaybackLayoutInput) {
 		motionBlurFilterRef,
 		stageSizeRef,
 		cursorOverlayRef,
+	]);
+
+	const syncPreviewShadowLayer = useCallback(() => {
+		const controller = previewShadowControllerRef.current;
+		if (!controller) return false;
+		const mask = baseMaskRef.current;
+		return controller.updateLayout({
+			enabled: Boolean(showShadow) && useCachedPixiShadows,
+			stageWidth: stageSizeRef.current.width,
+			maskX: mask.x,
+			maskY: mask.y,
+			maskWidth: mask.width,
+			maskHeight: mask.height,
+			maskRadius: mask.radius ?? 0,
+			shadowIntensity: showShadow ? shadowIntensity : 0,
+		});
+	}, [
+		previewShadowControllerRef,
+		baseMaskRef,
+		stageSizeRef,
+		showShadow,
+		shadowIntensity,
+		useCachedPixiShadows,
 	]);
 
 	const layoutVideoContent = useCallback(() => {
@@ -256,6 +292,8 @@ export function usePlaybackLayout(input: usePlaybackLayoutInput) {
 			});
 			cropBoundsRef.current = result.cropBounds;
 
+			syncPreviewShadowLayer();
+
 			// Layout updates the media geometry, not the composed camera pose.
 			// In particular, a ResizeObserver notification while paused must not
 			// replace the exported spring position with an unzoomed frame.
@@ -278,6 +316,7 @@ export function usePlaybackLayout(input: usePlaybackLayoutInput) {
 		padding,
 		applyWebcamBubbleLayout,
 		syncPreviewMotionBlurQuality,
+		syncPreviewShadowLayer,
 		containerRef,
 		appRef,
 		updatePreviewTextureRef,
@@ -300,6 +339,15 @@ export function usePlaybackLayout(input: usePlaybackLayoutInput) {
 		annotationFrameStore,
 		motionBlurStateRef,
 	]);
+
+	useEffect(() => {
+		if (!pixiReady || !videoReady) return;
+		const changed = syncPreviewShadowLayer();
+		const app = appRef.current;
+		if (changed && app && !app.ticker.started) {
+			app.render();
+		}
+	}, [pixiReady, videoReady, syncPreviewShadowLayer, appRef]);
 
 	useEffect(() => {
 		const video = videoRef.current;

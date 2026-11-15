@@ -319,6 +319,210 @@ export class OfflineAudioProcessor extends AudioMediaProcessor {
 		return new Blob(pcmParts, { type: "audio/wav" });
 	}
 
+	private timeStretchWorker: Worker | null = null;
+	private timeStretchRequestSeq = 0;
+	private timeStretchResolvers = new Map<
+		number,
+		{ resolve: (channels: Float32Array[]) => void; reject: (error: Error) => void }
+	>();
+
+	private getOrCreateTimeStretchWorker(): Worker | null {
+		if (this.timeStretchWorker) {
+			return this.timeStretchWorker;
+		}
+		if (typeof Worker === "undefined") {
+			return null;
+		}
+		try {
+			const worker = new Worker(new URL("./audioTimeStretch.worker.ts", import.meta.url), {
+				type: "module",
+			});
+			worker.addEventListener("message", (event) => {
+				const { requestId, outputChannels, error } = event.data ?? {};
+				const resolver = this.timeStretchResolvers.get(requestId);
+				if (!resolver) return;
+				this.timeStretchResolvers.delete(requestId);
+				if (error) {
+					resolver.reject(new Error(error));
+				} else if (outputChannels) {
+					resolver.resolve(outputChannels);
+				}
+			});
+			worker.addEventListener("error", (event) => {
+				const err = event.error ?? new Error(event.message || "Time-stretch worker failed");
+				for (const resolver of this.timeStretchResolvers.values()) {
+					resolver.reject(err);
+				}
+				this.timeStretchResolvers.clear();
+				this.disposeTimeStretchWorker();
+			});
+			this.timeStretchWorker = worker;
+			return worker;
+		} catch {
+			return null;
+		}
+	}
+
+	private disposeTimeStretchWorker(): void {
+		if (!this.timeStretchWorker) return;
+		try {
+			this.timeStretchWorker.terminate();
+		} catch {
+			// ignore
+		}
+		this.timeStretchWorker = null;
+		this.timeStretchResolvers.clear();
+	}
+
+	private async preStretchBufferForChunk(
+		buffer: AudioBuffer,
+		slices: TimelineSlice[],
+		sourceStartDelaySec: number,
+		chunkOutputStartSec: number,
+		chunkDurationSec: number,
+		mutedOutputRangesSec: Array<{ startSec: number; endSec: number }>,
+	): Promise<void> {
+		if (typeof buffer.getChannelData !== "function") {
+			return;
+		}
+		const hasNonUnitySpeed = slices.some((s) => Math.abs(s.speed - 1) >= 0.001);
+		if (!hasNonUnitySpeed) {
+			return;
+		}
+		const worker = this.getOrCreateTimeStretchWorker();
+		if (!worker) {
+			return;
+		}
+
+		let outputOffsetSec = 0;
+		for (const slice of slices) {
+			const sliceSourceDurationSec = (slice.sourceEndMs - slice.sourceStartMs) / 1000;
+			if (slice.outputStartMs !== undefined) outputOffsetSec = slice.outputStartMs / 1000;
+			const sliceOutputDurationSec = sliceSourceDurationSec / slice.speed;
+			const bufferOffsetSec = slice.sourceStartMs / 1000 - sourceStartDelaySec;
+
+			if (
+				bufferOffsetSec + sliceSourceDurationSec <= 0 ||
+				bufferOffsetSec >= buffer.duration
+			) {
+				outputOffsetSec += sliceOutputDurationSec;
+				continue;
+			}
+
+			let effectiveBufferStartSec = Math.max(0, bufferOffsetSec);
+			const trimmedFromStartSec = effectiveBufferStartSec - bufferOffsetSec;
+			let effectiveSourceDurationSec = Math.min(
+				sliceSourceDurationSec - trimmedFromStartSec,
+				buffer.duration - effectiveBufferStartSec,
+			);
+			if (effectiveSourceDurationSec <= 0.001) {
+				outputOffsetSec += sliceOutputDurationSec;
+				continue;
+			}
+
+			let localOutputStartSec =
+				outputOffsetSec + trimmedFromStartSec / slice.speed - chunkOutputStartSec;
+			const localOutputEndSec = localOutputStartSec + effectiveSourceDurationSec / slice.speed;
+			if (localOutputEndSec <= 0 || localOutputStartSec >= chunkDurationSec) {
+				outputOffsetSec += sliceOutputDurationSec;
+				continue;
+			}
+
+			if (localOutputStartSec < 0) {
+				const skipOutputSec = -localOutputStartSec;
+				const skipSourceSec = skipOutputSec * slice.speed;
+				effectiveBufferStartSec += skipSourceSec;
+				effectiveSourceDurationSec -= skipSourceSec;
+				localOutputStartSec = 0;
+			}
+			if (localOutputEndSec > chunkDurationSec) {
+				const excessOutputSec = localOutputEndSec - chunkDurationSec;
+				effectiveSourceDurationSec -= excessOutputSec * slice.speed;
+			}
+			if (effectiveSourceDurationSec <= 0.001) {
+				outputOffsetSec += sliceOutputDurationSec;
+				continue;
+			}
+
+			if (Math.abs(slice.speed - 1) < 0.001) {
+				outputOffsetSec += sliceOutputDurationSec;
+				continue;
+			}
+
+			const audibleRanges: Array<{ startSec: number; endSec: number }> = [
+				{
+					startSec: localOutputStartSec + chunkOutputStartSec,
+					endSec:
+						localOutputStartSec +
+						chunkOutputStartSec +
+						effectiveSourceDurationSec / slice.speed,
+				},
+			];
+			for (const mutedRange of mutedOutputRangesSec) {
+				for (let rangeIndex = audibleRanges.length - 1; rangeIndex >= 0; rangeIndex -= 1) {
+					const current = audibleRanges[rangeIndex];
+					const overlapStart = Math.max(current.startSec, mutedRange.startSec);
+					const overlapEnd = Math.min(current.endSec, mutedRange.endSec);
+					if (overlapEnd <= overlapStart) continue;
+					audibleRanges.splice(rangeIndex, 1);
+					if (current.startSec < overlapStart) {
+						audibleRanges.push({ startSec: current.startSec, endSec: overlapStart });
+					}
+					if (overlapEnd < current.endSec) {
+						audibleRanges.push({ startSec: overlapEnd, endSec: current.endSec });
+					}
+				}
+			}
+
+			for (const audibleRange of audibleRanges) {
+				const audibleDurationSec = audibleRange.endSec - audibleRange.startSec;
+				if (audibleDurationSec <= 0.001) continue;
+
+				const sourceOffsetSec =
+					effectiveBufferStartSec +
+					(audibleRange.startSec - (localOutputStartSec + chunkOutputStartSec)) *
+						slice.speed;
+				const sourceDurationSec = audibleDurationSec * slice.speed;
+				const cacheKey = this.getStretchCacheKey(
+					buffer,
+					slice.speed,
+					sourceOffsetSec,
+					sourceDurationSec,
+					audibleDurationSec,
+				);
+				if (!cacheKey || this.prestretchedSliceCache.has(cacheKey)) continue;
+
+				try {
+					const inputChannels = Array.from(
+						{ length: buffer.numberOfChannels },
+						(_, c) => buffer.getChannelData(c).slice(),
+					);
+					const outputChannels = await new Promise<Float32Array[]>((resolve, reject) => {
+						const requestId = ++this.timeStretchRequestSeq;
+						this.timeStretchResolvers.set(requestId, { resolve, reject });
+						worker.postMessage(
+							{
+								requestId,
+								inputChannels,
+								sampleRate: buffer.sampleRate,
+								speed: slice.speed,
+								sourceOffsetSec,
+								sourceDurationSec,
+								audibleDurationSec,
+							},
+							inputChannels.map((ch) => ch.buffer),
+						);
+					});
+					this.prestretchedSliceCache.set(cacheKey, outputChannels);
+				} catch {
+					// Fall back to synchronous stretchAudioBuffer on main thread if worker fails
+				}
+			}
+
+			outputOffsetSec += sliceOutputDurationSec;
+		}
+	}
+
 	// Shared chunked rendering loop. Processes the timeline in
 	// OFFLINE_CHUNK_DURATION_SEC segments, calling onChunk for each rendered buffer.
 	protected async renderChunked(
@@ -334,67 +538,96 @@ export class OfflineAudioProcessor extends AudioMediaProcessor {
 		let outputOffsetSec = 0;
 		const chunkCount = Math.ceil(totalOutputSec / OFFLINE_CHUNK_DURATION_SEC);
 
-		for (let i = 0; i < chunkCount && !this.cancelled; i++) {
-			const chunkSec = Math.min(OFFLINE_CHUNK_DURATION_SEC, totalOutputSec - outputOffsetSec);
-			const chunkFrames = Math.ceil(chunkSec * OFFLINE_AUDIO_SAMPLE_RATE);
-
-			const offlineCtx = new OfflineAudioContext(
-				numChannels,
-				chunkFrames,
-				OFFLINE_AUDIO_SAMPLE_RATE,
-			);
-
-			// Schedule main audio
-			if (prepared.mainBufferEntry) {
-				this.scheduleBufferThroughTimeline(
-					offlineCtx,
-					prepared.mainBufferEntry.buffer,
-					slices,
-					0,
-					prepared.mainBufferEntry.gain,
-					outputOffsetSec,
-					chunkSec,
-					prepared.mutedSourceOutputRangesSec,
-					"embedded",
+		try {
+			for (let i = 0; i < chunkCount && !this.cancelled; i++) {
+				const chunkSec = Math.min(
+					OFFLINE_CHUNK_DURATION_SEC,
+					totalOutputSec - outputOffsetSec,
 				);
-			}
+				const chunkFrames = Math.ceil(chunkSec * OFFLINE_AUDIO_SAMPLE_RATE);
 
-			// Schedule companion/sidecar audio
-			for (const entry of prepared.companionEntries) {
-				this.scheduleBufferThroughTimeline(
-					offlineCtx,
-					entry.buffer,
-					slices,
-					entry.startDelaySec,
-					entry.gain,
-					outputOffsetSec,
-					chunkSec,
-					prepared.mutedSourceOutputRangesSec,
-					entry.trackId,
+				if (prepared.mainBufferEntry) {
+					await this.preStretchBufferForChunk(
+						prepared.mainBufferEntry.buffer,
+						slices,
+						0,
+						outputOffsetSec,
+						chunkSec,
+						prepared.mutedSourceOutputRangesSec,
+					);
+				}
+				for (const entry of prepared.companionEntries) {
+					await this.preStretchBufferForChunk(
+						entry.buffer,
+						slices,
+						entry.startDelaySec,
+						outputOffsetSec,
+						chunkSec,
+						prepared.mutedSourceOutputRangesSec,
+					);
+				}
+
+				const offlineCtx = new OfflineAudioContext(
+					numChannels,
+					chunkFrames,
+					OFFLINE_AUDIO_SAMPLE_RATE,
 				);
+
+				// Schedule main audio
+				if (prepared.mainBufferEntry) {
+					this.scheduleBufferThroughTimeline(
+						offlineCtx,
+						prepared.mainBufferEntry.buffer,
+						slices,
+						0,
+						prepared.mainBufferEntry.gain,
+						outputOffsetSec,
+						chunkSec,
+						prepared.mutedSourceOutputRangesSec,
+						"embedded",
+					);
+				}
+
+				// Schedule companion/sidecar audio
+				for (const entry of prepared.companionEntries) {
+					this.scheduleBufferThroughTimeline(
+						offlineCtx,
+						entry.buffer,
+						slices,
+						entry.startDelaySec,
+						entry.gain,
+						outputOffsetSec,
+						chunkSec,
+						prepared.mutedSourceOutputRangesSec,
+						entry.trackId,
+					);
+				}
+
+				// Schedule audio region overlays
+				for (const { buffer, region } of prepared.regionEntries) {
+					this.scheduleRegionForChunk(
+						offlineCtx,
+						buffer,
+						region,
+						slices,
+						outputOffsetSec,
+						chunkSec,
+						prepared.usesClipTimeline,
+					);
+				}
+
+				const rendered = await offlineCtx.startRendering();
+				if (this.cancelled) break;
+				softLimitOfflineMixPeaksInPlace(rendered);
+
+				await onChunk(rendered, outputOffsetSec, i);
+
+				outputOffsetSec += chunkSec;
+				this.onProgress?.(0.3 + (outputOffsetSec / totalOutputSec) * 0.7);
 			}
-
-			// Schedule audio region overlays
-			for (const { buffer, region } of prepared.regionEntries) {
-				this.scheduleRegionForChunk(
-					offlineCtx,
-					buffer,
-					region,
-					slices,
-					outputOffsetSec,
-					chunkSec,
-					prepared.usesClipTimeline,
-				);
-			}
-
-			const rendered = await offlineCtx.startRendering();
-			if (this.cancelled) break;
-			softLimitOfflineMixPeaksInPlace(rendered);
-
-			await onChunk(rendered, outputOffsetSec, i);
-
-			outputOffsetSec += chunkSec;
-			this.onProgress?.(0.3 + (outputOffsetSec / totalOutputSec) * 0.7);
+		} finally {
+			this.prestretchedSliceCache.clear();
+			this.disposeTimeStretchWorker();
 		}
 	}
 

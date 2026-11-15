@@ -10,6 +10,7 @@ import {
 	getNativeCaptureHelperBinaryPath,
 } from "../../paths/binaries";
 import { getSourceArea } from "../../sourceArea";
+import { getMainPerformanceBudget } from "../../system/hardwareProfile";
 import {
 	nativeCaptureMicrophonePath,
 	nativeCaptureOutputBuffer,
@@ -53,7 +54,10 @@ export async function startMacCapture(
 	let captProc: ChildProcessWithoutNullStreams | null = null;
 
 	try {
-		const recordingsDir = await getRecordingsDir();
+		const [recordingsDir, budget] = await Promise.all([
+			getRecordingsDir(),
+			getMainPerformanceBudget(),
+		]);
 
 		// Warm up TCC: trigger an Electron-level screen capture API call so macOS
 		// activates the screen-recording grant for this process tree before the
@@ -102,7 +106,9 @@ export async function startMacCapture(
 			? path.join(recordingsDir, `recording-${timestamp}.mic.m4a`)
 			: null;
 		const config: Record<string, unknown> = {
-			fps: 60,
+			fps: budget.recording.fps,
+			maxWidth: budget.recording.maxWidth,
+			maxHeight: budget.recording.maxHeight,
 			outputPath,
 			capturesSystemAudio,
 			capturesMicrophone,

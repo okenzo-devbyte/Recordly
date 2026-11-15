@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
 	focusStart: vi.fn(),
 	focusStop: vi.fn(),
 	fromContents: vi.fn(),
+	prefsRead: vi.fn(async () => ({})),
+	prefsUpdate: vi.fn(async () => undefined),
 }));
 vi.mock("electron", () => ({
 	app: {},
@@ -48,7 +50,19 @@ vi.mock("../constants", () => ({
 	SHORTCUTS_FILE: "/unused/shortcuts.json",
 }));
 vi.mock("../settings/recordingPreferencesStore", () => ({
-	createRecordingPreferencesStore: () => ({ read: vi.fn(), update: vi.fn() }),
+	createRecordingPreferencesStore: () => ({
+		read: mocks.prefsRead,
+		update: mocks.prefsUpdate,
+	}),
+}));
+vi.mock("../system/hardwareProfile", () => ({
+	getSystemHardwareProfile: vi.fn(async () => ({
+		platform: "win32",
+		logicalProcessors: 8,
+		totalMemoryGb: 8,
+		hasHardwareEncoder: true,
+		recommendedTier: "low",
+	})),
 }));
 vi.mock("../utils", () => ({ parseJsonWithByteOrderMark: JSON.parse }));
 
@@ -280,3 +294,82 @@ describe("inline recording countdown", () => {
 		expect(vi.getTimerCount()).toBe(0);
 	});
 });
+
+describe("hardware profile and performance preferences", () => {
+	beforeEach(() => {
+		mocks.handlers.clear();
+		mocks.send.mockReset();
+		mocks.healthySend.mockClear();
+		mocks.prefsRead.mockReset();
+		mocks.prefsUpdate.mockReset();
+		mocks.prefsRead.mockResolvedValue({});
+		mocks.prefsUpdate.mockResolvedValue(undefined);
+		registerSettingsHandlers();
+	});
+
+	it("returns the detected system hardware profile", async () => {
+		const result = await mocks.handlers.get("get-system-hardware-profile")!();
+		expect(result).toEqual({
+			success: true,
+			profile: {
+				platform: "win32",
+				logicalProcessors: 8,
+				totalMemoryGb: 8,
+				hasHardwareEncoder: true,
+				recommendedTier: "low",
+			},
+		});
+	});
+
+	it("normalizes stored performance preferences on read", async () => {
+		mocks.prefsRead.mockResolvedValue({
+			performanceMode: "invalid-tier",
+			captureMaxResolution: "1080p",
+			captureFps: 30,
+		});
+		await expect(mocks.handlers.get("get-performance-preferences")!()).resolves.toEqual({
+			success: true,
+			performanceMode: "auto",
+			captureMaxResolution: "1080p",
+			captureFps: 30,
+		});
+	});
+
+	it("sanitizes, saves, and broadcasts updated performance preferences", async () => {
+		mocks.prefsRead.mockResolvedValue({
+			performanceMode: "low",
+			captureMaxResolution: "1080p",
+			captureFps: 30,
+		});
+		const result = await mocks.handlers.get("set-performance-preferences")!(
+			{},
+			{
+				performanceMode: "low",
+				captureMaxResolution: "1080p",
+				captureFps: 30,
+			},
+		);
+		expect(mocks.prefsUpdate).toHaveBeenCalledExactlyOnceWith({
+			performanceMode: "low",
+			captureMaxResolution: "1080p",
+			captureFps: 30,
+		});
+		expect(result).toEqual({
+			success: true,
+			performanceMode: "low",
+			captureMaxResolution: "1080p",
+			captureFps: 30,
+		});
+		expect(mocks.send).toHaveBeenCalledWith("performance-preferences-changed", {
+			performanceMode: "low",
+			captureMaxResolution: "1080p",
+			captureFps: 30,
+		});
+		expect(mocks.healthySend).toHaveBeenCalledWith("performance-preferences-changed", {
+			performanceMode: "low",
+			captureMaxResolution: "1080p",
+			captureFps: 30,
+		});
+	});
+});
+

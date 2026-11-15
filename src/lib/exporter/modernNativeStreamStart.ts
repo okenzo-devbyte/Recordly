@@ -1,3 +1,4 @@
+import { getPerformanceBudgetSnapshot } from "@/lib/performanceProfileStore";
 import { NATIVE_EXPORT_ENGINE_NAME } from "./modernExportConstants";
 import type { ModernExportHooks } from "./modernExportHooks";
 import type { ModernExportSession } from "./modernExportSession";
@@ -99,6 +100,9 @@ export async function startNativeVideoExport(session: Session, hooks: Hooks): Pr
 	}
 	if (session.cancelled) return false;
 
+	const budget = getPerformanceBudgetSnapshot();
+	const lowMemory =
+		budget.export.allowLowMemoryProfile && (budget.hardware?.totalMemoryGb ?? Infinity) <= 8;
 	const result = await window.electronAPI.nativeVideoExportStart({
 		width: session.config.width,
 		height: session.config.height,
@@ -106,6 +110,9 @@ export async function startNativeVideoExport(session: Session, hooks: Hooks): Pr
 		bitrate: session.config.bitrate,
 		encodingMode: session.config.encodingMode ?? "balanced",
 		inputMode: "h264-stream",
+		maxThreads: budget.export.libx264MaxThreads,
+		preferFastSoftwarePreset: budget.export.preferFastSoftwarePreset,
+		lowMemory,
 		...(session.config.deliveryProfile === "cloud"
 			? { deliveryProfile: "cloud" as const }
 			: {}),
@@ -202,6 +209,9 @@ export async function startRawvideoNativeExport(
 	reason: string,
 ): Promise<boolean> {
 	if (session.cancelled) return false;
+	const budget = getPerformanceBudgetSnapshot();
+	const lowMemory =
+		budget.export.allowLowMemoryProfile && (budget.hardware?.totalMemoryGb ?? Infinity) <= 8;
 	const result = await window.electronAPI.nativeVideoExportStart({
 		width: session.config.width,
 		height: session.config.height,
@@ -209,6 +219,9 @@ export async function startRawvideoNativeExport(
 		bitrate: session.config.bitrate,
 		encodingMode: session.config.encodingMode ?? "balanced",
 		inputMode: "rawvideo",
+		maxThreads: budget.export.libx264MaxThreads,
+		preferFastSoftwarePreset: budget.export.preferFastSoftwarePreset,
+		lowMemory,
 		...(session.config.deliveryProfile === "cloud"
 			? { deliveryProfile: "cloud" as const }
 			: {}),

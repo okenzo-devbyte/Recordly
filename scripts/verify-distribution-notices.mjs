@@ -17,6 +17,7 @@ export function verifyPackagedDistributionNotices(resourcesDir, binaryPath) {
 		"assets/cursors/pixel-glove/LICENSE.GPL",
 		"assets/cursors/pixel-glove/arrow.svg",
 		"assets/fonts/dm-sans/OFL.txt",
+		"assets/fonts/noto-sans-thai/OFL.txt",
 		"assets/fonts/tiktok-sans/OFL.txt",
 		"native/sherpa-onnx/LICENSE",
 		"native/onnxruntime/LICENSE",

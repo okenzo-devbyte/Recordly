@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OPEN_EDITOR_SECTION_EVENT } from "@/lib/announcementActions";
 import { type AnnouncementEditorSection, isAnnouncementEditorSection } from "@/lib/announcements";
 import type { AspectRatio } from "@/utils/aspectRatioUtils";
@@ -6,6 +6,7 @@ import type { loadEditorPreferences } from "../editorPreferences";
 import type { TimelineEditorHandle } from "../timeline/TimelineEditor";
 import type { CropRegion, EditorEffectSection } from "../types";
 import type { VideoPlaybackRef } from "../VideoPlayback";
+import { createPlaybackClockStore, type PlaybackClockStore } from "./playbackClockStore";
 
 type SessionPresentation = {
 	hideOverlayCursorByDefault?: boolean;
@@ -21,7 +22,15 @@ export function useEditorUiState(
 		typeof navigator !== "undefined" && /Mac/i.test(navigator.platform) ? "darwin" : "",
 	);
 	const [isPlaying, setIsPlaying] = useState(false);
-	const [currentTime, setCurrentTime] = useState(0);
+	const [playbackClock] = useState<PlaybackClockStore>(() => createPlaybackClockStore(0, 0));
+	const setCurrentTime = useCallback<Dispatch<SetStateAction<number>>>(
+		(value) => {
+			const next =
+				typeof value === "function" ? value(playbackClock.getTimelineTime()) : value;
+			playbackClock.setTime(next, next === 0 ? 0 : undefined);
+		},
+		[playbackClock],
+	);
 	const [duration, setDuration] = useState(0);
 	const [sessionShowCursorOverride, setSessionShowCursorOverride] = useState<boolean | null>(
 		null,
@@ -111,7 +120,7 @@ export function useEditorUiState(
 		appPlatform,
 		isPlaying,
 		setIsPlaying,
-		currentTime,
+		playbackClock,
 		setCurrentTime,
 		duration,
 		setDuration,

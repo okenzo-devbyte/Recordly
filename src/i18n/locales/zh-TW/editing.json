@@ -172,5 +172,7 @@
 	"mergeClipsUnavailable": "合併需要連續的素材，且速度與音訊設定必須一致。",
 	"mergeClips": "合併片段",
 	"captionStyleClassic": "經典",
-	"captionStyleReveal": "逐詞顯現"
+	"captionStyleReveal": "逐詞顯現",
+	"captionLanguageth": "泰文",
+	"parakeetLanguageRequiresWhisper": "所選語言需要 Whisper Base 或 Whisper Small。Parakeet 僅支援歐洲語言。"
 }

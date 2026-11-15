@@ -11,7 +11,7 @@ const cursorSamples = [
 	{ timeMs: 0, cx: 0.5, cy: 0.5, interactionType: "move" },
 	{ timeMs: 1000, cx: 0.6, cy: 0.5, interactionType: "move" },
 ];
-vi.mock("@/lib/exporter/frameRenderer", () => ({
+vi.mock("@/lib/exporter/modernFrameRenderer", () => ({
 	FrameRenderer: class {
 		constructor(config: unknown) {
 			renderer.construct(config);

@@ -8,7 +8,12 @@ import {
 } from "react";
 import { toast } from "@/components/ui/toast";
 import { useScopedT } from "@/contexts/I18nContext";
-import { type CaptionModelId, getCaptionModel, isCaptionModelId } from "@/shared/captionModels";
+import {
+	type CaptionModelId,
+	getCaptionModel,
+	isCaptionLanguageSupportedByModel,
+	isCaptionModelId,
+} from "@/shared/captionModels";
 import { resolveAutoCaptionSourcePath } from "../autoCaptionSource";
 import { type CaptionEditTarget, updateCaptionCuesForEditedTarget } from "../captionEditing";
 import { resolveVideoUrl } from "../projectPersistence";
@@ -63,6 +68,7 @@ export function useAutoCaptionController({
 	setWhisperModelDownloadProgress,
 	isGeneratingCaptions,
 	setIsGeneratingCaptions,
+	autoCaptionSettings,
 	setAutoCaptionSettings,
 	setAutoCaptions,
 	syncActiveVideoSource,
@@ -270,6 +276,20 @@ export function useAutoCaptionController({
 			isGeneratingCaptions
 		)
 			return;
+		const captionLanguage = autoCaptionSettings?.language?.trim() || "auto";
+		const selectedModel = getCaptionModel(captionModelId);
+		if (
+			selectedModel.engine === "parakeet" &&
+			!isCaptionLanguageSupportedByModel(captionLanguage, captionModelId)
+		) {
+			toast.error(
+				te(
+					"parakeetLanguageRequiresWhisper",
+					"Selected language requires Whisper Base or Whisper Small. Parakeet supports European languages only.",
+				),
+			);
+			return;
+		}
 		captionGenerationInFlightRef.current = true;
 		setIsGeneratingCaptions(true);
 		try {
@@ -317,14 +337,14 @@ export function useAutoCaptionController({
 			const result = await window.electronAPI.generateAutoCaptions({
 				videoPath: sourcePath,
 				captionModelId,
-				engine: getCaptionModel(captionModelId).engine,
-				...(getCaptionModel(captionModelId).engine === "parakeet"
+				engine: selectedModel.engine,
+				...(selectedModel.engine === "parakeet"
 					? { parakeetModelPath: managedModelPath }
 					: {
 							whisperModelPath: managedModelPath,
 							whisperExecutablePath: whisperExecutablePath ?? undefined,
 						}),
-				language: "auto",
+				language: captionLanguage,
 			});
 			if (resolveAutoCaptionSourcePath(activeSourceRef.current) !== sourcePath) {
 				toast.info(
@@ -360,6 +380,7 @@ export function useAutoCaptionController({
 			setIsGeneratingCaptions(false);
 		}
 	}, [
+		autoCaptionSettings?.language,
 		te,
 		downloadSelectedModel,
 		captionModelId,

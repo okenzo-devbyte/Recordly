@@ -172,5 +172,7 @@
 	"mergeClipsUnavailable": "Para combinar, el material debe ser continuo y tener la misma velocidad y los mismos ajustes de audio.",
 	"mergeClips": "Combinar clips",
 	"captionStyleClassic": "Clásico",
-	"captionStyleReveal": "Revelar"
+	"captionStyleReveal": "Revelar",
+	"captionLanguageth": "Tailandés",
+	"parakeetLanguageRequiresWhisper": "El idioma seleccionado requiere Whisper Base o Whisper Small. Parakeet solo admite idiomas europeos."
 }

@@ -253,6 +253,8 @@ export function SettingsPanel(input: SettingsPanelProps) {
 						webcamPreviewSrc={webcamPreviewSrc}
 						webcamPreviewCurrentTime={webcamPreviewCurrentTime}
 						webcamPreviewPlaying={webcamPreviewPlaying}
+						playbackClock={props.playbackClock}
+						clipRegions={props.clipRegions}
 						onWebcamChange={onWebcamChange}
 						onUploadWebcam={onUploadWebcam}
 					/>

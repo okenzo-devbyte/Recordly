@@ -1,4 +1,5 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { usePerformanceBudget } from "@/lib/performanceProfileStore";
 import { useTimelineContext, type Span } from "dnd-timeline";
 import { useEffect, useRef, useState } from "react";
 import { filmstripSampleTimes } from "../../core/filmstrip";
@@ -14,6 +15,9 @@ export function ClipFilmstrip({
 	sourceSpan: Span;
 }) {
 	const { range } = useTimelineContext();
+	const performanceBudget = usePerformanceBudget();
+	const maxFrames = Math.max(1, performanceBudget.preview.filmstripMaxFrames || 32);
+	const intervalFactor = Math.max(1, performanceBudget.preview.filmstripIntervalFactor || 1);
 	const ref = useRef<HTMLDivElement>(null);
 	const [count, setCount] = useState(0);
 	const [frames, setFrames] = useState<string[]>([]);
@@ -23,15 +27,16 @@ export function ClipFilmstrip({
 		if (!node) return;
 		const observer = new ResizeObserver(([entry]) => {
 			const { width, height } = entry.contentRect;
+			const baseTileWidth = Math.max(60, (height * 16) / 9) * intervalFactor;
 			setCount(
 				width > 0
-					? Math.min(32, Math.max(1, Math.ceil(width / Math.max(60, (height * 16) / 9))))
+					? Math.min(maxFrames, Math.max(1, Math.ceil(width / baseTileWidth)))
 					: 0,
 			);
 		});
 		observer.observe(node);
 		return () => observer.disconnect();
-	}, []);
+	}, [maxFrames, intervalFactor]);
 	const start = Math.max(span.start, range.start);
 	const end = Math.min(span.end, range.end);
 	const [windowRange, setWindowRange] = useState({ start, end, count });

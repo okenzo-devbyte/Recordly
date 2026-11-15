@@ -1,3 +1,21 @@
+export const CAPTION_LANGUAGES = [
+	"auto",
+	"en",
+	"es",
+	"fr",
+	"de",
+	"it",
+	"pt",
+	"zh",
+	"ja",
+	"ko",
+	"th",
+] as const;
+
+export type CaptionLanguage = (typeof CAPTION_LANGUAGES)[number];
+
+const NON_EUROPEAN_CAPTION_LANGUAGES = new Set<string>(["zh", "ja", "ko", "th"]);
+
 export const CAPTION_MODELS = [
 	{
 		id: "parakeet-v3",
@@ -40,4 +58,17 @@ export function isCaptionModelId(value: unknown): value is CaptionModelId {
 
 export function getCaptionModel(id: CaptionModelId) {
 	return CAPTION_MODELS.find((model) => model.id === id)!;
+}
+
+export function isCaptionLanguageSupportedByModel(
+	language: string | undefined,
+	modelId: CaptionModelId,
+): boolean {
+	if (getCaptionModel(modelId).engine === "whisper") return true;
+	const normalized = language?.trim().toLowerCase() ?? "auto";
+	return !NON_EUROPEAN_CAPTION_LANGUAGES.has(normalized);
+}
+
+export function getPreferredWhisperModelForLanguage(): CaptionModelId {
+	return "whisper-base";
 }

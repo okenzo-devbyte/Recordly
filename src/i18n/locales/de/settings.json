@@ -598,5 +598,40 @@
 	},
 	"annotation": {
 		"delete": "Anmerkung löschen"
+	},
+	"performance": {
+		"title": "Leistung",
+		"hardwareSummary": "{{cores}} Kerne · {{memory}} GB RAM · {{encoder}}",
+		"hwEncoderReady": "HW-Encoder bereit",
+		"cpuEncoderOnly": "CPU-Encoder-Fallback",
+		"recommendedLabel": "Empfohlen: {{tier}}",
+		"mode": "Leistungsmodus",
+		"modeDescription": "Passt Aufnahme-, Vorschau- und Exportressourcen automatisch an oder legt ein Qualitätsprofil fest.",
+		"modes": {
+			"auto": "Automatisch ({{tier}})",
+			"low": "Eco (Leichtgewicht)",
+			"balanced": "Ausgewogen",
+			"high": "Hohe Qualität"
+		},
+		"tiers": {
+			"low": "Eco",
+			"balanced": "Ausgewogen",
+			"high": "Hoch"
+		},
+		"captureResolution": "Aufnahmeauflösung",
+		"captureResolutionDescription": "Begrenzt die Bildschirmauflösung, um CPU, Arbeitsspeicher und Speicherplatz auf schwächeren PCs zu schonen.",
+		"resolutions": {
+			"auto": "Auto",
+			"1080p": "1080p",
+			"native": "Nativ"
+		},
+		"captureFps": "Aufnahme-FPS",
+		"captureFpsDescription": "Nutze 30 FPS für flüssigeres Multitasking auf 4–8-Kern-Systemen oder 60 FPS für maximale Bewegungsunschärfe.",
+		"fpsOptions": {
+			"auto": "Auto",
+			"30": "30 FPS",
+			"60": "60 FPS"
+		},
+		"saveFailed": "Leistungseinstellungen konnten nicht gespeichert werden."
 	}
 }

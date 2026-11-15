@@ -119,8 +119,18 @@ export async function initialize(
 		| "maskGraphics"
 	>,
 ): Promise<void> {
-	if (context.config.autoCaptionSettings?.enabled)
+	if (context.config.autoCaptionSettings?.enabled) {
 		await ensureCaptionFontLoaded(context.config.autoCaptionSettings);
+		if (
+			context.config.autoCaptionSettings.language === "th" ||
+			context.config.autoCaptions?.some((cue) => /[\u0E00-\u0E7F]/.test(cue.text))
+		) {
+			const { ensureCaptionThaiFallbackLoaded } = await import(
+				"@/components/video-editor/captionFonts"
+			);
+			await ensureCaptionThaiFallbackLoaded();
+		}
+	}
 	let cursorOverlayEnabled = true;
 	try {
 		await preloadCursorAssets();

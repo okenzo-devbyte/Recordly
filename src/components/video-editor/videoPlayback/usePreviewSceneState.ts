@@ -4,6 +4,7 @@ import type { ZoomBlurFilter } from "pixi-filters/zoom-blur";
 import { useRef, useState } from "react";
 import { type ZoomRegion } from "../types";
 import { createAnnotationFrameStore } from "./annotationFrameStore";
+import type { PreviewShadowController } from "./previewShadows";
 import {
 	type AnnotationRecordingRect,
 	type ComposedPreviewFrame,
@@ -21,6 +22,8 @@ export function usePreviewSceneState() {
 	const videoSpriteRef = useRef<Sprite | null>(null);
 
 	const videoEffectsContainerRef = useRef<Container | null>(null);
+
+	const previewShadowControllerRef = useRef<PreviewShadowController | null>(null);
 
 	const videoContainerRef = useRef<Container | null>(null);
 
@@ -70,6 +73,7 @@ export function usePreviewSceneState() {
 		y: number;
 		width: number;
 		height: number;
+		radius?: number;
 		renderWidth?: number;
 		renderHeight?: number;
 		sourceCrop?: {
@@ -97,6 +101,7 @@ export function usePreviewSceneState() {
 		appRef,
 		videoSpriteRef,
 		videoEffectsContainerRef,
+		previewShadowControllerRef,
 		videoContainerRef,
 		zoomBlurFilterRef,
 		motionBlurFilterRef,

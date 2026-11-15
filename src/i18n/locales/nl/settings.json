@@ -598,5 +598,40 @@
 	},
 	"annotation": {
 		"delete": "Annotatie verwijderen"
+	},
+	"performance": {
+		"title": "Prestaties",
+		"hardwareSummary": "{{cores}} cores · {{memory}} GB werkgeheugen · {{encoder}}",
+		"hwEncoderReady": "HW-encoder gereed",
+		"cpuEncoderOnly": "Alleen CPU-encoder",
+		"recommendedLabel": "Aanbevolen: {{tier}}",
+		"mode": "Prestatiemodus",
+		"modeDescription": "Past brongebruik voor opname, voorvertoning en export automatisch aan of kiest een vast profiel.",
+		"modes": {
+			"auto": "Auto ({{tier}})",
+			"low": "Eco (lichte pc)",
+			"balanced": "Gebalanceerd",
+			"high": "Hoge kwaliteit"
+		},
+		"tiers": {
+			"low": "Eco",
+			"balanced": "Gebalanceerd",
+			"high": "Hoog"
+		},
+		"captureResolution": "Opnameresolutie",
+		"captureResolutionDescription": "Beperkt de opnameresolutie om CPU-, geheugen- en schijfgebruik op lichtere pc’s te verlagen.",
+		"resolutions": {
+			"auto": "Auto",
+			"1080p": "1080p",
+			"native": "Origineel"
+		},
+		"captureFps": "Opname-FPS",
+		"captureFpsDescription": "Gebruik 30 FPS voor soepeler multitasken op 4–8 cores of 60 FPS voor maximale bewegingshelderheid.",
+		"fpsOptions": {
+			"auto": "Auto",
+			"30": "30 FPS",
+			"60": "60 FPS"
+		},
+		"saveFailed": "Kan prestatie-instellingen niet opslaan."
 	}
 }

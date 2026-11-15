@@ -88,6 +88,36 @@ export class WaveformGenerator {
 		if (inflight) return inflight;
 
 		const request = (async () => {
+			if (typeof window !== "undefined" && window.electronAPI?.extractAudioWaveformPeaks) {
+				try {
+					const ipcResult = await window.electronAPI.extractAudioWaveformPeaks({
+						mediaPathOrUrl: url,
+						peakCount,
+					});
+					if (
+						ipcResult?.success &&
+						ipcResult.peaks &&
+						ipcResult.peaks.length > 0 &&
+						typeof ipcResult.durationMs === "number" &&
+						ipcResult.durationMs > 0
+					) {
+						const peaks =
+							ipcResult.peaks instanceof Float32Array
+								? ipcResult.peaks
+								: new Float32Array(ipcResult.peaks);
+						const result: AudioPeaksData = {
+							peaks,
+							durationMs: ipcResult.durationMs,
+						};
+						this.peaksCache.setIfCurrent(cacheScope, cacheKey, result);
+						this.pending.delete(cacheKey);
+						return result;
+					}
+				} catch {
+					// Fall back to browser fetch + AudioContext decode below.
+				}
+			}
+
 			const response = await fetch(url);
 			if (!response.ok) {
 				throw new Error(`Failed to load media: ${response.status}`);

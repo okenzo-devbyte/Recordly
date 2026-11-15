@@ -1,4 +1,4 @@
-import type { Dispatch, RefObject, SetStateAction } from "react";
+import { type Dispatch, type RefObject, type SetStateAction, useCallback, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -36,6 +36,7 @@ import type { useEditorPlaybackControls } from "../hooks/useEditorPlaybackContro
 import type { useTimelineProjection } from "../hooks/useTimelineProjection";
 import type { useZoomRegionCommands } from "../hooks/useZoomRegionCommands";
 import { formatPlaybackTime } from "../playbackTime";
+import type { PlaybackClockStore } from "../state/playbackClockStore";
 import type { useAppearanceState } from "../state/useAppearanceState";
 import type { useTimelineState } from "../state/useTimelineState";
 import type { TimelineEditorHandle } from "../timeline/TimelineEditor";
@@ -60,6 +61,37 @@ function TimestampDigits({ value }: { value: string }) {
 	));
 }
 
+function PlaybackCurrentTimestamp({
+	playbackClock,
+	fallbackTime,
+	width,
+}: {
+	playbackClock?: PlaybackClockStore;
+	fallbackTime: number;
+	width: string;
+}) {
+	const subscribe = useCallback(
+		(listener: () => void) =>
+			playbackClock ? playbackClock.subscribe(listener) : () => undefined,
+		[playbackClock],
+	);
+	const currentTimestamp = useSyncExternalStore(
+		subscribe,
+		() => formatPlaybackTime(playbackClock ? playbackClock.getTimelineTime() : fallbackTime),
+		() => formatPlaybackTime(fallbackTime),
+	);
+	return (
+		<span
+			role="timer"
+			aria-label={currentTimestamp}
+			className="mr-1 shrink-0 whitespace-nowrap text-right text-[10px] font-medium tabular-nums text-muted-foreground"
+			style={{ width }}
+		>
+			<TimestampDigits value={currentTimestamp} />
+		</span>
+	);
+}
+
 type Props = {
 	t: ReturnType<typeof useI18n>["t"];
 	videoPath: string | null;
@@ -69,7 +101,8 @@ type Props = {
 	previewAspectRatioValue: number;
 	videoPlaybackRef: RefObject<VideoPlaybackRef | null>;
 	timelineRef: RefObject<TimelineEditorHandle | null>;
-	currentTime: number;
+	playbackClock?: PlaybackClockStore;
+	currentTime?: number;
 	isPlaying: boolean;
 	previewVolume: number;
 	setPreviewVolume: Dispatch<SetStateAction<number>>;
@@ -92,7 +125,7 @@ type Props = {
 	setDuration: Dispatch<SetStateAction<number>>;
 	isPreviewReady: boolean;
 	setIsPreviewReady: Dispatch<SetStateAction<boolean>>;
-	setCurrentTime: Dispatch<SetStateAction<number>>;
+	setCurrentTime?: Dispatch<SetStateAction<number>>;
 	setIsPlaying: Dispatch<SetStateAction<boolean>>;
 	setError: (message: string | null) => void;
 };
@@ -109,6 +142,7 @@ export function EditorPreviewPanel(props: Props) {
 		previewAspectRatioValue,
 		videoPlaybackRef,
 		timelineRef,
+		playbackClock,
 		currentTime,
 		isPlaying,
 		previewVolume,
@@ -136,7 +170,6 @@ export function EditorPreviewPanel(props: Props) {
 		setIsPlaying,
 		setError,
 	} = props;
-	const currentTimestamp = formatPlaybackTime(projection.timelinePlayheadTime);
 	const durationTimestamp = formatPlaybackTime(projection.timelineDuration);
 	// Reserve label and digit space without changing the inherited UI typography.
 	const timestampWidth = `${Math.max(6, durationTimestamp.length)}ch`;
@@ -243,6 +276,7 @@ export function EditorPreviewPanel(props: Props) {
 									previewVersion={previewVersion}
 									aspectRatio={aspectRatio}
 									playbackRef={videoPlaybackRef}
+									playbackClock={playbackClock}
 									currentTime={currentTime}
 									isPlaying={isPlaying && !isCropping}
 									previewVolume={previewVolume}
@@ -364,14 +398,11 @@ export function EditorPreviewPanel(props: Props) {
 
 				<div className="editor-playback-center z-10 flex items-center justify-center">
 					<div className="pointer-events-auto flex items-center gap-1.5">
-						<span
-							role="timer"
-							aria-label={currentTimestamp}
-							className="mr-1 shrink-0 whitespace-nowrap text-right text-[10px] font-medium tabular-nums text-muted-foreground"
-							style={{ width: timestampWidth }}
-						>
-							<TimestampDigits value={currentTimestamp} />
-						</span>
+						<PlaybackCurrentTimestamp
+							playbackClock={playbackClock}
+							fallbackTime={currentTime ?? projection.timelinePlayheadTime}
+							width={timestampWidth}
+						/>
 						<Button
 							variant="ghost"
 							size="icon"

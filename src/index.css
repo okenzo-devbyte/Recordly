@@ -34,6 +34,15 @@
 	font-weight: 100 1000;
 	font-display: swap;
 }
+/* Noto Sans Thai is scoped to Thai codepoints so Latin metrics stay on DM Sans. */
+@font-face {
+	font-family: "Noto Sans Thai";
+	src: url("./assets/fonts/noto-sans-thai/NotoSansThai-Variable.ttf") format("truetype");
+	font-style: normal;
+	font-weight: 100 900;
+	font-display: swap;
+	unicode-range: U+E00-E7F, U+200C-200D, U+25CC;
+}
 
 /* Layout aliases only. All component colors and styling come from HeroUI's default theme. */
 @theme inline {
@@ -100,8 +109,8 @@
 
 	:root {
 		--app-font-sans:
-			"DM Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-			sans-serif;
+			"DM Sans", "Noto Sans Thai", ui-sans-serif, system-ui, -apple-system,
+			BlinkMacSystemFont, "Segoe UI", sans-serif;
 		--brand-accent: var(--accent);
 		--brand-accent-rgb: 0, 111, 238;
 		--primary: var(--accent);
@@ -166,6 +175,21 @@
 	font-weight: 500;
 	line-height: 40px;
 	letter-spacing: -1.1px;
+}
+
+:root[lang="th"] .heading-display {
+	letter-spacing: normal;
+	line-height: 1.35;
+}
+
+:root[lang="th"] .settings-language-trigger .truncate,
+:root[lang="th"] .truncate {
+	line-height: 1.5;
+	padding-block: 1px;
+}
+
+:root[lang="th"] :is(button, [role="tab"], [role="option"]) {
+	line-height: 1.45;
 }
 
 .modal__heading:not(.heading-display) {

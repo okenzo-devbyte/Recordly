@@ -172,5 +172,7 @@
 	"mergeClipsUnavailable": "L’unione richiede riprese continue con la stessa velocità e le stesse impostazioni audio.",
 	"mergeClips": "Unisci clip",
 	"captionStyleClassic": "Classico",
-	"captionStyleReveal": "Rivela"
+	"captionStyleReveal": "Rivela",
+	"captionLanguageth": "Thailandese",
+	"parakeetLanguageRequiresWhisper": "La lingua selezionata richiede Whisper Base o Whisper Small. Parakeet supporta solo le lingue europee."
 }

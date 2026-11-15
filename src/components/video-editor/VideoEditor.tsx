@@ -53,7 +53,7 @@ function VideoEditorContent() {
 	const {
 		isPlaying,
 		setIsPlaying,
-		currentTime,
+		playbackClock,
 		setCurrentTime,
 		duration,
 		setDuration,
@@ -165,7 +165,6 @@ function VideoEditorContent() {
 		appearance,
 		timeline,
 		videoPlaybackRef,
-		currentTime,
 		effectiveShowCursor,
 	});
 	const handleShowCursorChange = useCallback((nextShowCursor: boolean) => {
@@ -220,7 +219,6 @@ function VideoEditorContent() {
 		setVideoPath,
 		videoSourcePath,
 		setVideoSourcePath,
-		currentTime,
 		setCurrentTime,
 		setIsPlaying,
 		setDuration,
@@ -268,7 +266,7 @@ function VideoEditorContent() {
 		videoSourcePath,
 		currentSourcePath,
 		duration,
-		currentTime,
+		playbackClock,
 		isPlaying,
 		previewVolume,
 		setActiveEffectSection,
@@ -355,7 +353,7 @@ function VideoEditorContent() {
 		autoCaptionController,
 		effectiveShowCursor,
 		handleShowCursorChange,
-		currentTime,
+		playbackClock,
 		isPlaying,
 		aspectRatio,
 		setAspectRatio,

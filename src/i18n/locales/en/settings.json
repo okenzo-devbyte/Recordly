@@ -598,5 +598,40 @@
 	},
 	"annotation": {
 		"delete": "Delete Annotation"
+	},
+	"performance": {
+		"title": "Performance",
+		"hardwareSummary": "{{cores}} cores · {{memory}} GB RAM · {{encoder}}",
+		"hwEncoderReady": "HW encoder ready",
+		"cpuEncoderOnly": "CPU encoder fallback",
+		"recommendedLabel": "Recommended: {{tier}}",
+		"mode": "Performance mode",
+		"modeDescription": "Adjust capture, preview, and export resource usage automatically or lock a quality preset.",
+		"modes": {
+			"auto": "Auto ({{tier}})",
+			"low": "Eco (Low-spec)",
+			"balanced": "Balanced",
+			"high": "High quality"
+		},
+		"tiers": {
+			"low": "Eco",
+			"balanced": "Balanced",
+			"high": "High"
+		},
+		"captureResolution": "Capture resolution",
+		"captureResolutionDescription": "Cap screen recording resolution to reduce CPU, memory, and disk usage on lighter PCs.",
+		"resolutions": {
+			"auto": "Auto",
+			"1080p": "1080p",
+			"native": "Native"
+		},
+		"captureFps": "Capture FPS",
+		"captureFpsDescription": "Use 30 FPS for smoother multitasking on 4–8 core machines or 60 FPS for maximum motion clarity.",
+		"fpsOptions": {
+			"auto": "Auto",
+			"30": "30 FPS",
+			"60": "60 FPS"
+		},
+		"saveFailed": "Could not save performance settings."
 	}
 }

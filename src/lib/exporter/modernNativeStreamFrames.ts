@@ -16,11 +16,31 @@ type Session = Pick<
 >;
 
 export function captureRawvideoFrame(session: Session, _hooks: Hooks): Uint8Array {
-	const source = session.browser.renderer!.getCanvas();
+	const renderer = session.browser.renderer!;
+	const source = renderer.getCanvas();
 	const { width, height } = session.config;
 	if (source.width !== width || source.height !== height) {
 		throw new Error("Rendered canvas size does not match the requested export dimensions");
 	}
+	const byteLength = width * height * 4;
+	const bytes =
+		typeof session.native.acquireReadbackBuffer === "function"
+			? session.native.acquireReadbackBuffer(byteLength)
+			: new Uint8Array(byteLength);
+
+	// Fast path: when rendering on WebGL without a Canvas2D annotation override,
+	// gl.readPixels already returns bottom-up RGBA matching FFmpeg's -vf vflip
+	// without an extra 2D canvas drawImage or JS row-reversal copy.
+	if (
+		typeof (renderer as { captureBottomUpPixelsInto?: (target: Uint8Array) => boolean })
+			.captureBottomUpPixelsInto === "function" &&
+		(
+			renderer as { captureBottomUpPixelsInto: (target: Uint8Array) => boolean }
+		).captureBottomUpPixelsInto(bytes)
+	) {
+		return bytes;
+	}
+
 	// Read the final output viewport, including Canvas2D annotation composites.
 	// Extracting stage bounds instead can include offscreen zoom/shadow content.
 	session.native.nativeReadbackCanvas ??= document.createElement("canvas");
@@ -31,7 +51,6 @@ export function captureRawvideoFrame(session: Session, _hooks: Hooks): Uint8Arra
 	if (!ctx) throw new Error("Canvas readback is unavailable for bundled FFmpeg export");
 	ctx.drawImage(source, 0, 0);
 	const pixels = ctx.getImageData(0, 0, width, height).data;
-	const bytes = new Uint8Array(width * height * 4);
 	// Native FFmpeg's established rawvideo path applies vflip. Feed bottom-up
 	// RGBA consistently; Canvas2D readback is always top-down on every backend.
 	const stride = width * 4;

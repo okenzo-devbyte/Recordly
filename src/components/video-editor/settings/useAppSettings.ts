@@ -7,6 +7,12 @@ import {
 } from "@/components/video-editor/cursorMotionPresets";
 import { useShortcuts } from "@/contexts/ShortcutsContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import {
+	ensurePerformanceProfileLoaded,
+	updatePerformancePreferences,
+	usePerformanceBudget,
+} from "@/lib/performanceProfileStore";
+import type { PerformancePreferences } from "@/shared/performanceProfile";
 
 import type { ResolvedSettingsPanelProps } from "./settingsPanelDefaults";
 import { useSettingsTranslations } from "./useSettingsTranslations";
@@ -56,8 +62,10 @@ export function useAppSettings(
 	} = props;
 	const { tSettings } = useSettingsTranslations();
 	const { preference: themePreference, setPreference: setThemePreference } = useTheme();
+	const performanceBudget = usePerformanceBudget();
 	const [experimentalUpdatesEnabled, setExperimentalUpdatesEnabled] = useState(false);
 	const [savingExperimentalUpdates, setSavingExperimentalUpdates] = useState(false);
+	const [savingPerformancePreferences, setSavingPerformancePreferences] = useState(false);
 	const { openConfig: openShortcutsConfig } = useShortcuts();
 	useEffect(() => {
 		let cancelled = false;
@@ -69,10 +77,28 @@ export function useAppSettings(
 			.catch((error) => {
 				console.error("Failed to load experimental updates preference:", error);
 			});
+		void ensurePerformanceProfileLoaded();
 		return () => {
 			cancelled = true;
 		};
 	}, []);
+
+	const updatePerformancePreferencesState = async (
+		patch: Partial<PerformancePreferences>,
+	) => {
+		setSavingPerformancePreferences(true);
+		try {
+			const result = await updatePerformancePreferences(patch);
+			if (!result.success) {
+				toast.error(
+					result.error ||
+						tSettings("performance.saveFailed", "Could not save performance settings."),
+				);
+			}
+		} finally {
+			setSavingPerformancePreferences(false);
+		}
+	};
 
 	const updateExperimentalUpdatesPreference = async (enabled: boolean) => {
 		const previousValue = experimentalUpdatesEnabled;
@@ -137,6 +163,9 @@ export function useAppSettings(
 		experimentalUpdatesEnabled,
 		savingExperimentalUpdates,
 		updateExperimentalUpdatesPreference,
+		performanceBudget,
+		savingPerformancePreferences,
+		updatePerformancePreferencesState,
 		activeMotionPresetId,
 		applyMotionPreset,
 		openShortcutsConfig,

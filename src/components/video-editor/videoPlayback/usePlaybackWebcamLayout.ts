@@ -1,6 +1,7 @@
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { getWebcamShadowFilter } from "@/lib/exporter/shadowProfile";
+import { getPerformanceBudgetSnapshot } from "@/lib/performanceProfileStore";
 import { getWebcamGlassRimPath, getWebcamGlassRimWidth } from "../glassRim";
 import {
 	DEFAULT_WEBCAM_REACT_TO_ZOOM,
@@ -250,8 +251,14 @@ export function usePlaybackWebcamLayout(input: usePlaybackWebcamLayoutInput) {
 								(isPlayingRef.current && !isSeekingRef.current),
 							edgeFeatherPx,
 							layout: { x, y, ...scaledDimensions, radius: scaledRadius },
-							// Supersample small cameras even on standard-density displays.
-							resolution: Math.max(2, window.devicePixelRatio || 1),
+							// Supersample small cameras on balanced/high displays while respecting low-tier DPR caps.
+							resolution: (() => {
+								const budget = getPerformanceBudgetSnapshot();
+								return Math.max(
+									budget.tier === "low" ? 1 : 2,
+									Math.min(window.devicePixelRatio || 1, budget.preview.maxDpr),
+								);
+							})(),
 							shape: webcamShape,
 							timeMs: timelineTimeRef.current * 1000,
 							playing: isPlayingRef.current && !isSeekingRef.current,

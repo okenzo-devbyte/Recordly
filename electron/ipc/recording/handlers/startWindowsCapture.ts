@@ -3,6 +3,7 @@ import path from "node:path";
 import { app } from "electron";
 import { getMonitorHandles } from "../../monitorResolver";
 import { getWindowsCaptureExePath } from "../../paths/binaries";
+import { getMainPerformanceBudget } from "../../system/hardwareProfile";
 import {
 	setNativeScreenRecordingActive,
 	setWindowsCaptureOutputBuffer,
@@ -73,8 +74,11 @@ export async function startWindowsCapture(
 	let tempSystemAudioPath: string | null = null;
 	let tempMicPath: string | null = null;
 	try {
-		const exePath = getWindowsCaptureExePath();
-		const recordingsDir = await getRecordingsDir();
+		const [exePath, recordingsDir, budget] = await Promise.all([
+			Promise.resolve(getWindowsCaptureExePath()),
+			getRecordingsDir(),
+			getMainPerformanceBudget(),
+		]);
 		const timestamp = Date.now();
 		const outputPath = path.join(recordingsDir, `recording-${timestamp}.mp4`);
 		tempVideoPath = path.join(app.getPath("temp"), `recordly-native-${timestamp}.mp4`);
@@ -95,7 +99,10 @@ export async function startWindowsCapture(
 
 		const config: Record<string, unknown> = {
 			outputPath: tempVideoPath,
-			fps: 60,
+			fps: budget.recording.fps,
+			maxWidth: budget.recording.maxWidth,
+			maxHeight: budget.recording.maxHeight,
+			bitrate: budget.recording.maxTargetBitrateBps,
 		};
 
 		if (captureTarget.kind === "invalid-window") {

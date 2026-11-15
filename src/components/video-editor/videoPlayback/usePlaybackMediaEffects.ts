@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import {
 	clampMediaTimeToDuration,
 	enablePitchPreservingPlayback,
@@ -26,6 +26,7 @@ export type usePlaybackMediaEffectsInput = Pick<
 	| "videoRef"
 	| "currentTimeRef"
 	| "timelineTime"
+	| "playbackClock"
 	| "lastBackgroundSyncTimeRef"
 	| "videoEffectsContainerRef"
 	| "zoomBlurFilterRef"
@@ -53,11 +54,11 @@ export function usePlaybackMediaEffects(input: usePlaybackMediaEffectsInput) {
 		videoRef,
 		currentTimeRef,
 		timelineTime,
+		playbackClock,
 		lastBackgroundSyncTimeRef,
 		videoEffectsContainerRef,
 		zoomBlurFilterRef,
 		motionBlurFilterRef,
-		zoomMotionBlurRef,
 		motionBlurStateRef,
 		updatePreviewTextureRef,
 	} = input;
@@ -137,55 +138,66 @@ export function usePlaybackMediaEffects(input: usePlaybackMediaEffectsInput) {
 		updatePreviewTextureRef,
 	]);
 
+	const syncBackgroundVideo = useCallback(
+		(clipTimelineTime: number, playing: boolean) => {
+			const bgVideo = bgVideoRef.current;
+			if (!bgVideo) return;
+
+			const videoDuration =
+				Number.isFinite(bgVideo.duration) && bgVideo.duration > 0 ? bgVideo.duration : null;
+			const targetTime = videoDuration
+				? clipTimelineTime % videoDuration
+				: clampMediaTimeToDuration(clipTimelineTime, videoDuration);
+
+			enablePitchPreservingPlayback(bgVideo);
+			const syncedPlaybackRate = getMediaSyncPlaybackRate({
+				basePlaybackRate: 1,
+				currentTime: bgVideo.currentTime,
+				targetTime,
+				toleranceSeconds: 0.02,
+				correctionWindowSeconds: 1.5,
+				maxAdjustment: 0.12,
+			});
+			if (Math.abs(bgVideo.playbackRate - syncedPlaybackRate) > 0.001) {
+				bgVideo.playbackRate = syncedPlaybackRate;
+			}
+
+			const previousTimelineTime = lastBackgroundSyncTimeRef.current;
+			const timelineJumped =
+				previousTimelineTime === null ||
+				Math.abs(clipTimelineTime - previousTimelineTime) > 0.25;
+			const driftThreshold = playing ? 0.35 : 0.01;
+			if (timelineJumped || Math.abs(bgVideo.currentTime - targetTime) > driftThreshold) {
+				try {
+					bgVideo.currentTime = targetTime;
+				} catch {
+					// no-op
+				}
+			}
+
+			if (playing) {
+				const playPromise = bgVideo.play();
+				if (playPromise) {
+					playPromise.catch(() => undefined);
+				}
+			} else {
+				bgVideo.pause();
+			}
+
+			lastBackgroundSyncTimeRef.current = clipTimelineTime;
+		},
+		[bgVideoRef, lastBackgroundSyncTimeRef],
+	);
+
 	// Backgrounds run on the output timeline, including empty clip intervals.
 	useEffect(() => {
-		const bgVideo = bgVideoRef.current;
-		if (!bgVideo) return;
-
-		const clipTimelineTime = timelineTime;
-		const videoDuration =
-			Number.isFinite(bgVideo.duration) && bgVideo.duration > 0 ? bgVideo.duration : null;
-		const targetTime = videoDuration
-			? clipTimelineTime % videoDuration
-			: clampMediaTimeToDuration(clipTimelineTime, videoDuration);
-
-		enablePitchPreservingPlayback(bgVideo);
-		const syncedPlaybackRate = getMediaSyncPlaybackRate({
-			basePlaybackRate: 1,
-			currentTime: bgVideo.currentTime,
-			targetTime,
-			toleranceSeconds: 0.02,
-			correctionWindowSeconds: 1.5,
-			maxAdjustment: 0.12,
+		const activeTime = playbackClock ? playbackClock.getTimelineTime() : timelineTime;
+		syncBackgroundVideo(activeTime, isPlaying);
+		if (!playbackClock) return;
+		return playbackClock.subscribe(() => {
+			syncBackgroundVideo(playbackClock.getTimelineTime(), isPlayingRef.current);
 		});
-		if (Math.abs(bgVideo.playbackRate - syncedPlaybackRate) > 0.001) {
-			bgVideo.playbackRate = syncedPlaybackRate;
-		}
-
-		const previousTimelineTime = lastBackgroundSyncTimeRef.current;
-		const timelineJumped =
-			previousTimelineTime === null ||
-			Math.abs(clipTimelineTime - previousTimelineTime) > 0.25;
-		const driftThreshold = isPlaying ? 0.35 : 0.01;
-		if (timelineJumped || Math.abs(bgVideo.currentTime - targetTime) > driftThreshold) {
-			try {
-				bgVideo.currentTime = targetTime;
-			} catch {
-				// no-op
-			}
-		}
-
-		if (isPlaying) {
-			const playPromise = bgVideo.play();
-			if (playPromise) {
-				playPromise.catch(() => undefined);
-			}
-		} else {
-			bgVideo.pause();
-		}
-
-		lastBackgroundSyncTimeRef.current = clipTimelineTime;
-	}, [timelineTime, isPlaying, bgVideoRef, lastBackgroundSyncTimeRef]);
+	}, [playbackClock, timelineTime, isPlaying, isPlayingRef, syncBackgroundVideo]);
 
 	useEffect(() => {
 		if (!pixiReady) return;
@@ -197,8 +209,7 @@ export function usePlaybackMediaEffects(input: usePlaybackMediaEffectsInput) {
 			return;
 		}
 
-		videoEffectsContainer.filters =
-			(zoomMotionBlurRef.current ?? 0) > 0 ? [motionBlurFilter, zoomBlurFilter] : null;
+		videoEffectsContainer.filters = null;
 		motionBlurFilter.velocity = { x: 0, y: 0 };
 		motionBlurFilter.kernelSize = 5;
 		motionBlurFilter.offset = 0;
@@ -211,7 +222,6 @@ export function usePlaybackMediaEffects(input: usePlaybackMediaEffectsInput) {
 		videoEffectsContainerRef,
 		zoomBlurFilterRef,
 		motionBlurFilterRef,
-		zoomMotionBlurRef,
 		motionBlurStateRef,
 	]);
 	return {};

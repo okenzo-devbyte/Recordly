@@ -598,5 +598,40 @@
 	},
 	"annotation": {
 		"delete": "Supprimer l’annotation"
+	},
+	"performance": {
+		"title": "Performances",
+		"hardwareSummary": "{{cores}} cœurs · {{memory}} Go RAM · {{encoder}}",
+		"hwEncoderReady": "Encodeur matériel prêt",
+		"cpuEncoderOnly": "Repli encodeur CPU",
+		"recommendedLabel": "Recommandé : {{tier}}",
+		"mode": "Mode de performances",
+		"modeDescription": "Adapte automatiquement les ressources de capture, prévisualisation et export ou verrouille un profil.",
+		"modes": {
+			"auto": "Automatique ({{tier}})",
+			"low": "Éco (config légère)",
+			"balanced": "Équilibré",
+			"high": "Haute qualité"
+		},
+		"tiers": {
+			"low": "Éco",
+			"balanced": "Équilibré",
+			"high": "Élevé"
+		},
+		"captureResolution": "Résolution de capture",
+		"captureResolutionDescription": "Plafonne la définition d’enregistrement pour réduire la charge CPU, mémoire et disque sur PC léger.",
+		"resolutions": {
+			"auto": "Auto",
+			"1080p": "1080p",
+			"native": "Native"
+		},
+		"captureFps": "FPS de capture",
+		"captureFpsDescription": "Utilisez 30 FPS pour préserver la fluidité sur 4 à 8 cœurs ou 60 FPS pour une netteté maximale.",
+		"fpsOptions": {
+			"auto": "Auto",
+			"30": "30 FPS",
+			"60": "60 FPS"
+		},
+		"saveFailed": "Impossible d’enregistrer les paramètres de performances."
 	}
 }

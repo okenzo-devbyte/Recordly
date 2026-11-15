@@ -4,6 +4,7 @@ import { resolveLinuxWindowBounds } from "../cursor/bounds";
 import { ffmpegCaptureOutputBuffer } from "../state";
 import type { SelectedSource } from "../types";
 import { getScreen, parseWindowId } from "../utils";
+import { getMainPerformanceBudget } from "../system/hardwareProfile";
 import { resolveWindowsCaptureDisplay } from "../windowsCaptureSelection";
 
 export function getDisplayBoundsForSource(source: SelectedSource) {
@@ -23,14 +24,22 @@ export function getDisplayWorkAreaForSource(source: SelectedSource) {
 }
 
 export async function buildFfmpegCaptureArgs(source: SelectedSource, outputPath: string) {
+	const budget = await getMainPerformanceBudget();
+	const fps = String(budget.recording.fps);
+	const shouldCapResolution = budget.recording.maxWidth < 3840 || budget.recording.maxHeight < 2160;
+	const capScaleExpr = shouldCapResolution
+		? `w='min(${budget.recording.maxWidth},iw)':h='min(${budget.recording.maxHeight},ih)':force_original_aspect_ratio=decrease:force_divisible_by=2:`
+		: "";
 	const buildOutputArgs = (inputRange: "auto" | "full") => [
 		"-an",
 		"-vf",
-		`scale=in_range=${inputRange}:out_range=tv:out_color_matrix=bt709:sws_dither=bayer`,
+		`scale=${capScaleExpr}in_range=${inputRange}:out_range=tv:out_color_matrix=bt709:sws_dither=bayer`,
 		"-c:v",
 		"libx264",
 		"-preset",
 		"veryfast",
+		"-threads",
+		String(budget.export.libx264MaxThreads),
 		"-pix_fmt",
 		"yuv420p",
 		"-colorspace",
@@ -63,7 +72,7 @@ export async function buildFfmpegCaptureArgs(source: SelectedSource, outputPath:
 				"-f",
 				"gdigrab",
 				"-framerate",
-				"60",
+				fps,
 				"-draw_mouse",
 				"0",
 				"-i",
@@ -77,7 +86,7 @@ export async function buildFfmpegCaptureArgs(source: SelectedSource, outputPath:
 			"-f",
 			"gdigrab",
 			"-framerate",
-			"60",
+			fps,
 			"-draw_mouse",
 			"0",
 			"-i",
@@ -99,7 +108,7 @@ export async function buildFfmpegCaptureArgs(source: SelectedSource, outputPath:
 				"-f",
 				"x11grab",
 				"-framerate",
-				"60",
+				fps,
 				"-draw_mouse",
 				"0",
 				"-video_size",
@@ -116,7 +125,7 @@ export async function buildFfmpegCaptureArgs(source: SelectedSource, outputPath:
 			"-f",
 			"x11grab",
 			"-framerate",
-			"60",
+			fps,
 			"-draw_mouse",
 			"0",
 			"-video_size",
@@ -135,7 +144,7 @@ export async function buildFfmpegCaptureArgs(source: SelectedSource, outputPath:
 			"-capture_cursor",
 			"0",
 			"-framerate",
-			"60",
+			fps,
 			"-i",
 			"1:none",
 			...buildOutputArgs("auto"),

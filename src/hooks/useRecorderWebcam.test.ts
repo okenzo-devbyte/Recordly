@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "@/components/ui/toast";
+import { resetPerformanceProfileStoreForTest } from "@/lib/performanceProfileStore";
 import { useRecorderWebcam } from "./useRecorderWebcam";
 import { useRecorderControls } from "./useRecorderControls";
 
@@ -68,6 +69,7 @@ describe("recorder webcam sidecar", () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
+		resetPerformanceProfileStoreForTest();
 		FakeMediaRecorder.instances = [];
 		FakeMediaRecorder.supported = true;
 		FakeMediaRecorder.constructorError = null;
@@ -102,6 +104,7 @@ describe("recorder webcam sidecar", () => {
 	});
 
 	afterEach(() => {
+		resetPerformanceProfileStoreForTest();
 		vi.restoreAllMocks();
 		vi.unstubAllGlobals();
 	});
@@ -124,31 +127,67 @@ describe("recorder webcam sidecar", () => {
 			video: {
 				width: { ideal: 1280 },
 				height: { ideal: 720 },
-				frameRate: { ideal: 60, max: 60 },
+				frameRate: { ideal: 30, max: 30 },
 			},
 			audio: false,
 		});
 		expect(recorder().options).toEqual({
-			videoBitsPerSecond: 8_000_000,
+			videoBitsPerSecond: 3_500_000,
 			mimeType: "video/webm;codecs=h264",
 		});
 		expect(recorder().start).not.toHaveBeenCalled();
 		expect(webcam.webcamStartTime.current).toBeNull();
 		webcam.beginWebcamCapture();
 		webcam.beginWebcamCapture();
-		expect(recorder().start).toHaveBeenCalledExactlyOnceWith(250);
+		expect(recorder().start).toHaveBeenCalledExactlyOnceWith(1_000);
 		expect(webcam.webcamStartTime.current).toBe(2_000);
 		await webcam.stopWebcamRecorder();
 	});
 
+	it("scales webcam capture down to 480p 30fps @ 2.5 Mbps on low-spec machines", async () => {
+		Object.assign(window.electronAPI, {
+			getSystemHardwareProfile: vi.fn().mockResolvedValue({
+				success: true,
+				profile: {
+					platform: "win32",
+					logicalProcessors: 4,
+					totalMemoryGb: 8,
+					hasHardwareEncoder: true,
+					recommendedTier: "low",
+				},
+			}),
+			getPerformancePreferences: vi.fn().mockResolvedValue({
+				success: true,
+				performanceMode: "auto",
+				captureMaxResolution: "auto",
+				captureFps: "auto",
+			}),
+		});
+		const webcam = createWebcam();
+		await webcam.prepareWebcamRecorder();
+		expect(getUserMedia).toHaveBeenCalledWith({
+			video: {
+				width: { ideal: 854 },
+				height: { ideal: 480 },
+				frameRate: { ideal: 30, max: 30 },
+			},
+			audio: false,
+		});
+		expect(recorder().options).toEqual({
+			videoBitsPerSecond: 2_500_000,
+			mimeType: "video/webm;codecs=h264",
+		});
+		await webcam.stopWebcamRecorder();
+	});
+
 	it("keeps cameras that negotiate a lower frame rate usable and reports the actual rate", async () => {
-		const settings = { frameRate: 30, width: 1280, height: 720 };
+		const settings = { frameRate: 24, width: 1280, height: 720 };
 		stream.getVideoTracks = () => [{ getSettings: () => settings }] as MediaStreamTrack[];
 		const webcam = createWebcam();
 		await webcam.prepareWebcamRecorder();
 		expect(FakeMediaRecorder.instances).toHaveLength(1);
 		expect(console.info).toHaveBeenCalledWith("[Recorder] Webcam capture settings", {
-			requestedFrameRate: 60,
+			requestedFrameRate: 30,
 			...settings,
 		});
 		await webcam.stopWebcamRecorder();

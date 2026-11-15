@@ -56,6 +56,8 @@ describe("preview element detach lifetime", () => {
 			useState: (value: unknown) => [value, () => undefined],
 			useEffect: () => undefined,
 			useLayoutEffect: () => undefined,
+			useSyncExternalStore: (_subscribe: () => () => void, getSnapshot: () => unknown) =>
+				getSnapshot(),
 		}));
 	});
 	afterAll(() => vi.doUnmock("react"));

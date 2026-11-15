@@ -58,6 +58,23 @@ function getEffectiveHardwareConcurrency(hardwareConcurrency?: number): number {
 	return 8;
 }
 
+function getEffectiveDeviceMemoryGb(deviceMemoryGb?: number | null): number | null {
+	if (typeof deviceMemoryGb === "number" && Number.isFinite(deviceMemoryGb) && deviceMemoryGb > 0) {
+		return deviceMemoryGb;
+	}
+
+	if (deviceMemoryGb === null) {
+		return null;
+	}
+
+	const nav = typeof navigator !== "undefined" ? (navigator as Navigator & { deviceMemory?: number }) : undefined;
+	if (typeof nav?.deviceMemory === "number" && Number.isFinite(nav.deviceMemory) && nav.deviceMemory > 0) {
+		return nav.deviceMemory;
+	}
+
+	return null;
+}
+
 function getRelativePixelRate(width: number, height: number, frameRate: number): number {
 	return (
 		(Math.max(1, width) * Math.max(1, height) * Math.max(1, frameRate)) /
@@ -73,13 +90,15 @@ export interface ExportBackpressureProfile {
 	maxInFlightNativeWrites: number;
 }
 
-interface ExportBackpressureProfileOptions {
+export interface ExportBackpressureProfileOptions {
 	encodeBackend: ExportEncodeBackend;
 	width: number;
 	height: number;
 	frameRate: number;
 	encodingMode?: ExportEncodingMode;
 	hardwareConcurrency?: number;
+	deviceMemoryGb?: number | null;
+	allowLowMemoryProfile?: boolean;
 }
 
 export function getPreferredWebCodecsLatencyModes(
@@ -114,6 +133,12 @@ export function getExportBackpressureProfile(
 	options: ExportBackpressureProfileOptions,
 ): ExportBackpressureProfile {
 	const hardwareConcurrency = getEffectiveHardwareConcurrency(options.hardwareConcurrency);
+	const deviceMemoryGb = getEffectiveDeviceMemoryGb(options.deviceMemoryGb);
+	const isLowMemorySystem =
+		options.allowLowMemoryProfile !== false &&
+		deviceMemoryGb !== null &&
+		deviceMemoryGb > 0 &&
+		deviceMemoryGb <= 8;
 	const relativePixelRate = getRelativePixelRate(
 		options.width,
 		options.height,
@@ -126,6 +151,16 @@ export function getExportBackpressureProfile(
 	const maxEncodeQueue = getWebCodecsEncodeQueueLimit(options.frameRate, options.encodingMode);
 
 	if (options.encodeBackend === "ffmpeg") {
+		if (isLowMemorySystem) {
+			return {
+				name: "breeze-low-memory",
+				maxEncodeQueue: Math.min(maxEncodeQueue, 24),
+				maxDecodeQueue: 4,
+				maxPendingFrames: 6,
+				maxInFlightNativeWrites: 2,
+			};
+		}
+
 		if (isLowCoreSystem || isExtremeWorkload) {
 			return {
 				name: "breeze-conservative",
@@ -152,6 +187,16 @@ export function getExportBackpressureProfile(
 			maxDecodeQueue: 12,
 			maxPendingFrames: 28,
 			maxInFlightNativeWrites: 4,
+		};
+	}
+
+	if (isLowMemorySystem) {
+		return {
+			name: "webcodecs-low-memory",
+			maxEncodeQueue: Math.min(maxEncodeQueue, 24),
+			maxDecodeQueue: 4,
+			maxPendingFrames: 8,
+			maxInFlightNativeWrites: 1,
 		};
 	}
 

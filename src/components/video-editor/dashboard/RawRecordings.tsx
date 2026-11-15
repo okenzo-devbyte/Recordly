@@ -2,11 +2,14 @@ import { useI18n as useUiLocale } from "@/contexts/I18nContext";
 import { Modal } from "@heroui/react";
 import { useEffect, useRef, useState } from "react";
 import { MusicNotes } from "@/components/ui/icons";
+import { usePerformanceBudget } from "@/lib/performanceProfileStore";
 import type { ProjectLibraryEntry } from "../ProjectBrowserDialog";
 import type { RecordingLibraryEntry } from "@/types/recordingLibrary";
 import { DurationBadge } from "./DurationBadge";
 const isAudio = (name: string) => /\.(wav|m4a|mp3|ogg|flac)$/i.test(name);
 export function RawThumbnail({ entry, active }: { entry: RecordingLibraryEntry; active: boolean }) {
+	const performanceBudget = usePerformanceBudget();
+	const allowHoverPreview = performanceBudget.preview.allowHoverVideoPreview;
 	const video = useRef<HTMLVideoElement>(null);
 	const [poster, setPoster] = useState<string>();
 	const [duration, setDuration] = useState<number>();
@@ -26,7 +29,11 @@ export function RawThumbnail({ entry, active }: { entry: RecordingLibraryEntry; 
 	useEffect(() => {
 		const element = video.current;
 		if (!element) return;
-		if (!active || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+		if (
+			!active ||
+			!allowHoverPreview ||
+			window.matchMedia("(prefers-reduced-motion: reduce)").matches
+		) {
 			element.pause();
 			element.currentTime = 0;
 			return;
@@ -44,11 +51,20 @@ export function RawThumbnail({ entry, active }: { entry: RecordingLibraryEntry; 
 			element.pause();
 			document.removeEventListener("visibilitychange", stop);
 		};
-	}, [active]);
+	}, [active, allowHoverPreview]);
 	return (
 		<div className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-xl bg-default/60">
 			{isAudio(entry.name) ? (
 				<MusicNotes weight="fill" className="size-8 text-muted-foreground/40" />
+			) : !allowHoverPreview && poster && duration !== undefined ? (
+				<img
+					src={poster}
+					alt=""
+					loading="lazy"
+					decoding="async"
+					draggable={false}
+					className="h-full w-full object-cover"
+				/>
 			) : (
 				<video
 					ref={video}

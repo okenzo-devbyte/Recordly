@@ -14,6 +14,7 @@ import {
 	FFMPEG_BT709_VIDEO_COLOR_ARGS,
 	isNativeCudaOutOfMemory,
 } from "./nativeVideoExport";
+import { getNativeVideoExportMaxQueuedWriteBytes } from "./export/nativeVideo/stream";
 
 describe("buildTrimmedSourceAudioFilter", () => {
 	it("concatenates trimmed source segments into a single output label", () => {
@@ -332,5 +333,21 @@ describe("native static layout command builders", () => {
 			),
 		).toBe(true);
 		expect(isNativeCudaOutOfMemory("FFmpeg exited with code 1")).toBe(false);
+	});
+
+	it("bounds native export stdin write queue bytes tighter on low-memory systems", () => {
+		const frame1080pBytes = 1920 * 1080 * 4;
+		const frame4kBytes = 3840 * 2160 * 4;
+		expect(getNativeVideoExportMaxQueuedWriteBytes(0)).toBe(8 * 1024 * 1024);
+		expect(getNativeVideoExportMaxQueuedWriteBytes(0, { lowMemory: true })).toBe(
+			4 * 1024 * 1024,
+		);
+		expect(getNativeVideoExportMaxQueuedWriteBytes(frame1080pBytes)).toBe(frame1080pBytes * 4);
+		expect(
+			getNativeVideoExportMaxQueuedWriteBytes(frame1080pBytes, { lowMemory: true }),
+		).toBe(frame1080pBytes * 2);
+		expect(getNativeVideoExportMaxQueuedWriteBytes(frame4kBytes, { lowMemory: true })).toBe(
+			16 * 1024 * 1024,
+		);
 	});
 });

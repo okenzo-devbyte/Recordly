@@ -1,13 +1,11 @@
 import { translate } from "@/i18n/runtime";
+import { ensurePerformanceProfileLoaded } from "@/lib/performanceProfileStore";
 import { acquireBrowserScreenCapture } from "./browserScreenCapture";
 import {
 	CHROME_MEDIA_SOURCE,
+	getCaptureBudget,
 	MIC_GAIN_BOOST,
-	MIN_FRAME_RATE,
 	resolveBrowserCaptureCursorPolicy,
-	TARGET_FRAME_RATE,
-	TARGET_HEIGHT,
-	TARGET_WIDTH,
 } from "./recorderCaptureOptions";
 import type { RecorderContext } from "./recorderContext";
 import { createProcessedMicrophoneConstraints } from "./recordingMicrophoneFallback";
@@ -56,6 +54,9 @@ export async function acquireRecorderBrowserStream(
 		mixingContext,
 	} = context;
 
+	const budget = await ensurePerformanceProfileLoaded();
+	const captureBudget = getCaptureBudget(budget);
+
 	const browserCursorPolicy = resolveBrowserCaptureCursorPolicy({
 		nativeWindowsCaptureStartFailed,
 	});
@@ -91,10 +92,10 @@ export async function acquireRecorderBrowserStream(
 		mandatory: {
 			chromeMediaSource: CHROME_MEDIA_SOURCE,
 			chromeMediaSourceId: browserCaptureSource.id,
-			maxWidth: TARGET_WIDTH,
-			maxHeight: TARGET_HEIGHT,
-			maxFrameRate: TARGET_FRAME_RATE,
-			minFrameRate: MIN_FRAME_RATE,
+			maxWidth: captureBudget.maxWidth,
+			maxHeight: captureBudget.maxHeight,
+			maxFrameRate: captureBudget.fps,
+			minFrameRate: captureBudget.minFrameRate,
 			googCaptureCursor: browserCursorPolicy.streamCursor === "always",
 		},
 		cursor: browserCursorPolicy.streamCursor,
@@ -107,9 +108,9 @@ export async function acquireRecorderBrowserStream(
 				audio: withAudio,
 				video: {
 					displaySurface: "monitor",
-					width: { ideal: TARGET_WIDTH, max: TARGET_WIDTH },
-					height: { ideal: TARGET_HEIGHT, max: TARGET_HEIGHT },
-					frameRate: { ideal: TARGET_FRAME_RATE, max: TARGET_FRAME_RATE },
+					width: { ideal: captureBudget.maxWidth, max: captureBudget.maxWidth },
+					height: { ideal: captureBudget.maxHeight, max: captureBudget.maxHeight },
+					frameRate: { ideal: captureBudget.fps, max: captureBudget.fps },
 					cursor: browserCursorPolicy.streamCursor,
 				},
 				selfBrowserSurface: "exclude",
@@ -209,9 +210,9 @@ export async function acquireRecorderBrowserStream(
 						displaySurface: selectedSource.id?.startsWith("window:")
 							? "window"
 							: "monitor",
-						width: { ideal: TARGET_WIDTH, max: TARGET_WIDTH },
-						height: { ideal: TARGET_HEIGHT, max: TARGET_HEIGHT },
-						frameRate: { ideal: TARGET_FRAME_RATE, max: TARGET_FRAME_RATE },
+						width: { ideal: captureBudget.maxWidth, max: captureBudget.maxWidth },
+						height: { ideal: captureBudget.maxHeight, max: captureBudget.maxHeight },
+						frameRate: { ideal: captureBudget.fps, max: captureBudget.fps },
 						cursor: browserCursorPolicy.streamCursor,
 					},
 					selfBrowserSurface: "exclude",
@@ -232,13 +233,13 @@ export async function acquireRecorderBrowserStream(
 
 	try {
 		await videoTrack.applyConstraints({
-			frameRate: { ideal: TARGET_FRAME_RATE, max: TARGET_FRAME_RATE },
-			width: { ideal: TARGET_WIDTH, max: TARGET_WIDTH },
-			height: { ideal: TARGET_HEIGHT, max: TARGET_HEIGHT },
+			frameRate: { ideal: captureBudget.fps, max: captureBudget.fps },
+			width: { ideal: captureBudget.maxWidth, max: captureBudget.maxWidth },
+			height: { ideal: captureBudget.maxHeight, max: captureBudget.maxHeight },
 		} as MediaTrackConstraints);
 	} catch (error) {
 		console.warn(
-			"Unable to lock 4K/60fps constraints, using best available track settings.",
+			"Unable to lock capture constraints, using best available track settings.",
 			error,
 		);
 	}

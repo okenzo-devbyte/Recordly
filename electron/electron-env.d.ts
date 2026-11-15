@@ -460,6 +460,25 @@ interface Window {
 		generateWallpaperThumbnail: (
 			filePath: string,
 		) => Promise<{ success: boolean; data?: Uint8Array; error?: string }>;
+		extractAudioWaveformPeaks?: (options: {
+			mediaPathOrUrl: string;
+			peakCount?: number;
+		}) => Promise<{
+			success: boolean;
+			peaks?: Float32Array;
+			durationMs?: number;
+			error?: string;
+		}>;
+		extractFilmstripFrames?: (options: {
+			videoPathOrUrl: string;
+			timesMs: number[];
+			width?: number;
+			height?: number;
+		}) => Promise<{
+			success: boolean;
+			frames?: Array<{ timeMs: number; jpegData: Uint8Array }>;
+			error?: string;
+		}>;
 		probeNativeVideoMetadata: (filePath: string) => Promise<{
 			success: boolean;
 			metadata?: RendererNativeVideoMetadataProbe;
@@ -569,6 +588,9 @@ interface Window {
 			encodingMode: "fast" | "balanced" | "quality";
 			inputMode?: "rawvideo" | "h264-stream";
 			deliveryProfile?: "cloud";
+			maxThreads?: number;
+			preferFastSoftwarePreset?: boolean;
+			lowMemory?: boolean;
 		}) => Promise<{
 			success: boolean;
 			sessionId?: string;
@@ -1328,6 +1350,31 @@ interface Window {
 		/** Countdown timer before recording */
 		getCountdownDelay: () => Promise<{ success: boolean; delay: number }>;
 		setCountdownDelay: (delay: number) => Promise<{ success: boolean; error?: string }>;
+		getSystemHardwareProfile?: () => Promise<{
+			success: boolean;
+			profile?: import("../src/shared/performanceProfile").SystemHardwareProfile;
+			error?: string;
+		}>;
+		getPerformancePreferences?: () => Promise<{
+			success: boolean;
+			performanceMode: import("../src/shared/performanceProfile").PerformanceMode;
+			captureMaxResolution: import("../src/shared/performanceProfile").CaptureMaxResolution;
+			captureFps: import("../src/shared/performanceProfile").CaptureFpsOption;
+		}>;
+		setPerformancePreferences?: (
+			prefs: Partial<import("../src/shared/performanceProfile").PerformancePreferences>,
+		) => Promise<{
+			success: boolean;
+			performanceMode: import("../src/shared/performanceProfile").PerformanceMode;
+			captureMaxResolution: import("../src/shared/performanceProfile").CaptureMaxResolution;
+			captureFps: import("../src/shared/performanceProfile").CaptureFpsOption;
+			error?: string;
+		}>;
+		onPerformancePreferencesChanged?: (
+			callback: (
+				prefs: import("../src/shared/performanceProfile").PerformancePreferences,
+			) => void,
+		) => () => void;
 		finishRecordingStartup: () => Promise<void>;
 		startCountdown: (seconds: number) => Promise<{ success: boolean; cancelled?: boolean }>;
 		cancelCountdown: () => Promise<{ success: boolean }>;

@@ -1,8 +1,11 @@
+import { type CSSProperties, memo, type RefObject, type SyntheticEvent, useSyncExternalStore } from "react";
 import { formatAspectRatioForCSS } from "@/utils/aspectRatioUtils";
 import { GLASS_RIM_COLOR } from "../glassRim";
+import type { WebcamOverlaySettings } from "../types";
 import { PlaybackAnnotations } from "./PlaybackAnnotations";
 import { PlaybackCaptions } from "./PlaybackCaptions";
 import type { PlaybackProps } from "./playbackProps";
+import type { PlaybackClockStore } from "../state/playbackClockStore";
 import type { usePlaybackCaptions } from "./usePlaybackCaptions";
 import type { usePlaybackControls } from "./usePlaybackControls";
 import type { usePlaybackState } from "./usePlaybackState";
@@ -10,6 +13,105 @@ import type { usePlaybackWallpaper } from "./usePlaybackWallpaper";
 import type { usePlaybackWebcamLayout } from "./usePlaybackWebcamLayout";
 import type { usePlaybackWebcamSync } from "./usePlaybackWebcamSync";
 import { isWebcamVisibleAtSourceTime } from "./webcamSync";
+
+const noopSubscribe = () => () => undefined;
+
+const PlaybackWebcamLayer = memo(function PlaybackWebcamLayer({
+	webcam,
+	webcamVideoPath,
+	webcamBubbleRef,
+	webcamBubbleInnerRef,
+	webcamVideoDimensions,
+	webcamMediaSynchronized,
+	webcamMirror,
+	webcamCropPreviewContentStyle,
+	webcamVideoRef,
+	handleWebcamMediaReady,
+	isGap,
+	playbackClock,
+	currentTime,
+}: {
+	webcam: WebcamOverlaySettings;
+	webcamVideoPath: string;
+	webcamBubbleRef: RefObject<HTMLDivElement | null>;
+	webcamBubbleInnerRef: RefObject<HTMLDivElement | null>;
+	webcamVideoDimensions: { width: number; height: number } | null;
+	webcamMediaSynchronized: boolean;
+	webcamMirror: boolean;
+	webcamCropPreviewContentStyle: CSSProperties;
+	webcamVideoRef: RefObject<HTMLVideoElement | null>;
+	handleWebcamMediaReady: (event: SyntheticEvent<HTMLVideoElement>) => void;
+	isGap: boolean;
+	playbackClock?: PlaybackClockStore;
+	currentTime: number;
+}) {
+	const hasVisibleRanges = Boolean(webcam.visibleRanges && !isGap);
+	const webcamVisible = useSyncExternalStore(
+		hasVisibleRanges && playbackClock ? playbackClock.subscribe : noopSubscribe,
+		() =>
+			Boolean(
+				webcam.enabled &&
+					!isGap &&
+					isWebcamVisibleAtSourceTime(
+						webcam,
+						playbackClock ? playbackClock.getSourceTime() : currentTime,
+					),
+			),
+	);
+
+	return (
+		<div
+			ref={webcamBubbleRef}
+			data-webcam-overlay
+			data-webcam-ready={Boolean(webcamVideoDimensions && webcamMediaSynchronized)}
+			className="absolute"
+			style={{
+				display: webcamVisible ? "block" : "none",
+				pointerEvents: "none",
+			}}
+		>
+			<div ref={webcamBubbleInnerRef} className="relative h-full w-full overflow-hidden">
+				<div
+					className="pointer-events-none absolute inset-0 overflow-hidden"
+					style={{
+						opacity: webcamVideoDimensions && webcamMediaSynchronized ? 1 : 0,
+						transform: webcamMirror ? "scaleX(-1)" : undefined,
+					}}
+				>
+					<div className="pointer-events-none absolute" style={webcamCropPreviewContentStyle}>
+						<video
+							crossOrigin="anonymous"
+							ref={webcamVideoRef}
+							src={webcamVideoPath}
+							className="pointer-events-none absolute inset-0 block h-full w-full object-fill"
+							muted
+							loop={webcam?.loop}
+							playsInline
+							preload="auto"
+							aria-hidden="true"
+							onLoadedMetadata={handleWebcamMediaReady}
+							onLoadedData={handleWebcamMediaReady}
+							onCanPlay={handleWebcamMediaReady}
+							onSeeked={handleWebcamMediaReady}
+						/>
+					</div>
+				</div>
+				<svg
+					data-webcam-glass-rim
+					aria-hidden="true"
+					focusable="false"
+					className="pointer-events-none absolute inset-0 h-full w-full"
+					style={{
+						opacity: webcamVideoDimensions && webcamMediaSynchronized ? 1 : 0,
+					}}
+				>
+					<path fill="none" stroke={GLASS_RIM_COLOR} />
+				</svg>
+			</div>
+		</div>
+	);
+});
+
 export type PlaybackViewInput = Pick<
 	ReturnType<typeof usePlaybackState> &
 		PlaybackProps &
@@ -42,6 +144,7 @@ export type PlaybackViewInput = Pick<
 	| "webcamVideoPath"
 	| "webcamBubbleRef"
 	| "currentTime"
+	| "playbackClock"
 	| "webcamBubbleInnerRef"
 	| "webcamVideoDimensions"
 	| "webcamMediaSynchronized"
@@ -50,7 +153,7 @@ export type PlaybackViewInput = Pick<
 	| "webcamVideoRef"
 	| "handleWebcamMediaReady"
 	| "captionFontReady"
-	| "activeCaptionLayout"
+	| "preparedCaptionLayout"
 	| "autoCaptionSettings"
 	| "onEditAutoCaption"
 	| "captionBoxRef"
@@ -107,6 +210,7 @@ export function PlaybackView(input: PlaybackViewInput) {
 		webcamVideoPath,
 		webcamBubbleRef,
 		currentTime,
+		playbackClock,
 		webcamBubbleInnerRef,
 		webcamVideoDimensions,
 		webcamMediaSynchronized,
@@ -224,74 +328,21 @@ export function PlaybackView(input: PlaybackViewInput) {
 							style={{ display: "none" }}
 						/>
 						{webcam && webcamVideoPath ? (
-							<div
-								ref={webcamBubbleRef}
-								data-webcam-overlay
-								data-webcam-ready={Boolean(
-									webcamVideoDimensions && webcamMediaSynchronized,
-								)}
-								className="absolute"
-								style={{
-									display:
-										webcam.enabled &&
-										!isGap &&
-										isWebcamVisibleAtSourceTime(webcam, currentTime)
-											? "block"
-											: "none",
-									pointerEvents: "none",
-								}}
-							>
-								<div
-									ref={webcamBubbleInnerRef}
-									className="relative h-full w-full overflow-hidden"
-								>
-									<div
-										className="pointer-events-none absolute inset-0 overflow-hidden"
-										style={{
-											opacity:
-												webcamVideoDimensions && webcamMediaSynchronized
-													? 1
-													: 0,
-											transform: webcamMirror ? "scaleX(-1)" : undefined,
-										}}
-									>
-										<div
-											className="pointer-events-none absolute"
-											style={webcamCropPreviewContentStyle}
-										>
-											<video
-												crossOrigin="anonymous"
-												ref={webcamVideoRef}
-												src={webcamVideoPath}
-												className="pointer-events-none absolute inset-0 block h-full w-full object-fill"
-												muted
-												loop={webcam?.loop}
-												playsInline
-												preload="auto"
-												aria-hidden="true"
-												onLoadedMetadata={handleWebcamMediaReady}
-												onLoadedData={handleWebcamMediaReady}
-												onCanPlay={handleWebcamMediaReady}
-												onSeeked={handleWebcamMediaReady}
-											/>
-										</div>
-									</div>
-									<svg
-										data-webcam-glass-rim
-										aria-hidden="true"
-										focusable="false"
-										className="pointer-events-none absolute inset-0 h-full w-full"
-										style={{
-											opacity:
-												webcamVideoDimensions && webcamMediaSynchronized
-													? 1
-													: 0,
-										}}
-									>
-										<path fill="none" stroke={GLASS_RIM_COLOR} />
-									</svg>
-								</div>
-							</div>
+							<PlaybackWebcamLayer
+								webcam={webcam}
+								webcamVideoPath={webcamVideoPath}
+								webcamBubbleRef={webcamBubbleRef}
+								webcamBubbleInnerRef={webcamBubbleInnerRef}
+								webcamVideoDimensions={webcamVideoDimensions}
+								webcamMediaSynchronized={webcamMediaSynchronized}
+								webcamMirror={webcamMirror}
+								webcamCropPreviewContentStyle={webcamCropPreviewContentStyle}
+								webcamVideoRef={webcamVideoRef}
+								handleWebcamMediaReady={handleWebcamMediaReady}
+								isGap={isGap}
+								playbackClock={playbackClock}
+								currentTime={currentTime}
+							/>
 						) : null}
 					</>
 					<PlaybackCaptions {...input} />

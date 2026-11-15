@@ -172,5 +172,7 @@
 	"mergeClipsUnavailable": "A mesclagem exige gravações contínuas com a mesma velocidade e as mesmas configurações de áudio.",
 	"mergeClips": "Mesclar clipes",
 	"captionStyleClassic": "Clássico",
-	"captionStyleReveal": "Revelar"
+	"captionStyleReveal": "Revelar",
+	"captionLanguageth": "Tailandês",
+	"parakeetLanguageRequiresWhisper": "O idioma selecionado exige Whisper Base ou Whisper Small. O Parakeet oferece suporte apenas a idiomas europeus."
 }

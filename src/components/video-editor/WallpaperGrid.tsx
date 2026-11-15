@@ -1,6 +1,6 @@
 import { Button, ToggleButton } from "@heroui/react";
-import { useEffect, useState } from "react";
-import { DesktopIcon, Plus, X } from "@/components/ui/icons";
+import { useEffect, useRef, useState } from "react";
+import { DesktopIcon, Plus, VideoCamera, X } from "@/components/ui/icons";
 import { useScopedT } from "@/contexts/I18nContext";
 import { getRenderableVideoUrl } from "@/lib/assetPath";
 import { isVideoWallpaperSource } from "@/lib/wallpapers";
@@ -14,6 +14,51 @@ interface WallpaperTile {
 	removable?: boolean;
 	disabled?: boolean;
 	badge?: string;
+}
+
+const MAX_WALLPAPER_POSTER_CACHE = 32;
+const WALLPAPER_POSTER_MAX_WIDTH = 160;
+const videoWallpaperPosterCache = new Map<string, string>();
+
+function getCachedVideoPoster(src: string): string | null {
+	const existing = videoWallpaperPosterCache.get(src);
+	if (!existing) return null;
+	// Refresh insertion order for simple bounded LRU eviction.
+	videoWallpaperPosterCache.delete(src);
+	videoWallpaperPosterCache.set(src, existing);
+	return existing;
+}
+
+function setCachedVideoPoster(src: string, dataUrl: string) {
+	if (videoWallpaperPosterCache.has(src)) {
+		videoWallpaperPosterCache.delete(src);
+	}
+	videoWallpaperPosterCache.set(src, dataUrl);
+	while (videoWallpaperPosterCache.size > MAX_WALLPAPER_POSTER_CACHE) {
+		const oldestKey = videoWallpaperPosterCache.keys().next().value;
+		if (oldestKey === undefined) break;
+		videoWallpaperPosterCache.delete(oldestKey);
+	}
+}
+
+function captureVideoPosterFrame(video: HTMLVideoElement, cacheKey: string): string | null {
+	if (video.videoWidth <= 0 || video.videoHeight <= 0) return null;
+	const width = Math.min(WALLPAPER_POSTER_MAX_WIDTH, video.videoWidth);
+	const height = Math.max(1, Math.round((video.videoHeight / video.videoWidth) * width));
+	const canvas = document.createElement("canvas");
+	canvas.width = width;
+	canvas.height = height;
+	const context = canvas.getContext("2d");
+	if (!context) return null;
+	try {
+		context.drawImage(video, 0, 0, width, height);
+		const dataUrl = canvas.toDataURL("image/jpeg", 0.72);
+		if (!dataUrl || dataUrl === "data:,") return null;
+		setCachedVideoPoster(cacheKey, dataUrl);
+		return dataUrl;
+	} catch {
+		return null;
+	}
 }
 
 /** Shared image/video gallery. Removal stays separate from the selection button. */
@@ -56,7 +101,7 @@ export function WallpaperGrid({
 							className="wallpaper-tile relative aspect-[4/3] h-auto w-full min-w-0 overflow-hidden rounded-md p-0"
 						>
 							{isVideoWallpaperSource(item.previewUrl) ? (
-								<WallpaperVideoPreview src={item.previewUrl} />
+								<WallpaperVideoPreview src={item.previewUrl} selected={selected} />
 							) : item.previewUrl ? (
 								<img
 									src={item.previewUrl || undefined}
@@ -90,10 +135,19 @@ export function WallpaperGrid({
 	);
 }
 
-function WallpaperVideoPreview({ src }: { src: string }) {
+function WallpaperVideoPreview({ src, selected }: { src: string; selected: boolean }) {
+	const [hovered, setHovered] = useState(false);
 	const [resolvedSrc, setResolvedSrc] = useState(src);
+	const [poster, setPoster] = useState<string | null>(() => getCachedVideoPoster(src));
+	const videoRef = useRef<HTMLVideoElement | null>(null);
+	const active = selected || hovered;
 
 	useEffect(() => {
+		setPoster(getCachedVideoPoster(src));
+	}, [src]);
+
+	useEffect(() => {
+		if (!active) return;
 		let cancelled = false;
 		setResolvedSrc(src);
 
@@ -113,21 +167,68 @@ function WallpaperVideoPreview({ src }: { src: string }) {
 		return () => {
 			cancelled = true;
 		};
-	}, [src]);
+	}, [active, src]);
+
+	useEffect(() => {
+		const video = videoRef.current;
+		if (!video) return;
+		if (hovered) {
+			void video.play().catch(() => undefined);
+			return;
+		}
+		video.pause();
+		if (video.currentTime !== 0) {
+			try {
+				video.currentTime = 0;
+			} catch {
+				// Ignore seek errors before metadata loads.
+			}
+		}
+	}, [hovered, active, resolvedSrc]);
 
 	return (
-		<video
-			src={resolvedSrc}
-			muted
-			playsInline
-			preload="metadata"
-			className="absolute inset-0 h-full w-full select-none object-cover"
-			draggable={false}
-			onMouseEnter={(e) => e.currentTarget.play().catch(() => undefined)}
-			onMouseLeave={(e) => {
-				e.currentTarget.pause();
-				e.currentTarget.currentTime = 0;
-			}}
-		/>
+		<span
+			className="absolute inset-0 block"
+			onMouseEnter={() => setHovered(true)}
+			onMouseLeave={() => setHovered(false)}
+		>
+			{active ? (
+				<video
+					ref={videoRef}
+					src={resolvedSrc}
+					poster={poster ?? undefined}
+					muted
+					playsInline
+					preload="metadata"
+					className="absolute inset-0 h-full w-full select-none object-cover"
+					draggable={false}
+					onLoadedData={(event) => {
+						const video = event.currentTarget;
+						if (!getCachedVideoPoster(src)) {
+							const captured = captureVideoPosterFrame(video, src);
+							if (captured) {
+								setPoster(captured);
+							}
+						}
+						if (hovered) {
+							void video.play().catch(() => undefined);
+						}
+					}}
+				/>
+			) : poster ? (
+				<img
+					src={poster}
+					alt=""
+					loading="lazy"
+					decoding="async"
+					draggable={false}
+					className="absolute inset-0 h-full w-full select-none object-cover"
+				/>
+			) : (
+				<span className="flex h-full w-full items-center justify-center bg-default/40">
+					<VideoCamera className="size-4 text-muted" aria-hidden="true" />
+				</span>
+			)}
+		</span>
 	);
 }

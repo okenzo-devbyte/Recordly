@@ -1,0 +1,16 @@
+{
+	"actions": {
+		"addZoom": "เพิ่มซูม",
+		"addTrim": "เพิ่มทริม",
+		"addSpeed": "เพิ่มช่วงปรับความเร็ว",
+		"addAnnotation": "เพิ่มคำอธิบายประกอบ",
+		"addKeyframe": "เพิ่มคีย์เฟรม",
+		"deleteSelected": "ลบรายการที่เลือก",
+		"playPause": "เล่น / หยุดชั่วคราว",
+		"cycleForward": "เลือกรายการถัดไป",
+		"cycleBackward": "เลือกรายการก่อนหน้า",
+		"deleteSelectedAlt": "ลบรายการที่เลือก (คีย์สำรอง)",
+		"panTimeline": "เลื่อนไทม์ไลน์",
+		"zoomTimeline": "ซูมไทม์ไลน์"
+	}
+}

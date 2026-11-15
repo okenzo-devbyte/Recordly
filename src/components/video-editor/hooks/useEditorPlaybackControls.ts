@@ -1,4 +1,5 @@
 import { type RefObject, useCallback } from "react";
+import type { PlaybackClockStore } from "../state/playbackClockStore";
 import type { TimelineEditorHandle } from "../timeline/TimelineEditor";
 import type { VideoPlaybackRef } from "../VideoPlayback";
 
@@ -6,7 +7,8 @@ interface UseEditorPlaybackControlsParams {
 	videoPlaybackRef: RefObject<VideoPlaybackRef | null>;
 	timelineRef: RefObject<TimelineEditorHandle | null>;
 	playSourceAudioPreview: () => void;
-	timelinePlayheadTime: number;
+	playbackClock?: PlaybackClockStore;
+	timelinePlayheadTime?: number;
 	timelineDuration: number;
 }
 
@@ -14,7 +16,8 @@ export function useEditorPlaybackControls({
 	videoPlaybackRef,
 	timelineRef,
 	playSourceAudioPreview,
-	timelinePlayheadTime,
+	playbackClock,
+	timelinePlayheadTime = 0,
 	timelineDuration,
 }: UseEditorPlaybackControlsParams) {
 	const getActivePlayback = useCallback(() => videoPlaybackRef.current, [videoPlaybackRef]);
@@ -54,20 +57,22 @@ export function useEditorPlaybackControls({
 	);
 
 	const handlePreviewSkipBack = useCallback(() => {
-		const currentMs = timelinePlayheadTime * 1000;
+		const playheadTime = playbackClock ? playbackClock.getTimelineTime() : timelinePlayheadTime;
+		const currentMs = playheadTime * 1000;
 		const keyframes = timelineRef.current?.keyframes ?? [];
 		const previous = [...keyframes]
 			.reverse()
 			.find((keyframe) => keyframe.time < currentMs - 50);
-		handleSeek(previous ? previous.time / 1000 : Math.max(0, timelinePlayheadTime - 5));
-	}, [handleSeek, timelinePlayheadTime, timelineRef]);
+		handleSeek(previous ? previous.time / 1000 : Math.max(0, playheadTime - 5));
+	}, [handleSeek, playbackClock, timelinePlayheadTime, timelineRef]);
 
 	const handlePreviewSkipForward = useCallback(() => {
-		const currentMs = timelinePlayheadTime * 1000;
+		const playheadTime = playbackClock ? playbackClock.getTimelineTime() : timelinePlayheadTime;
+		const currentMs = playheadTime * 1000;
 		const keyframes = timelineRef.current?.keyframes ?? [];
 		const next = keyframes.find((keyframe) => keyframe.time > currentMs + 50);
-		handleSeek(next ? next.time / 1000 : Math.min(timelineDuration, timelinePlayheadTime + 5));
-	}, [handleSeek, timelineDuration, timelinePlayheadTime, timelineRef]);
+		handleSeek(next ? next.time / 1000 : Math.min(timelineDuration, playheadTime + 5));
+	}, [handleSeek, playbackClock, timelineDuration, timelinePlayheadTime, timelineRef]);
 
 	return {
 		startPlayback,

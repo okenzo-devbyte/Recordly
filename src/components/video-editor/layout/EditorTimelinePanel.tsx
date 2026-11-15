@@ -1,6 +1,6 @@
-import type { RefObject } from "react";
+import { type RefObject, useCallback, useSyncExternalStore } from "react";
 import type { useVideoEditorAudio } from "../audio/useVideoEditorAudio";
-import { retimeCaptionFragment } from "../captionTimeline";
+import { type projectCaptionCues, retimeCaptionFragment } from "../captionTimeline";
 import type { useAnnotationRegionCommands } from "../hooks/useAnnotationRegionCommands";
 import type { useAudioRegionCommands } from "../hooks/useAudioRegionCommands";
 import type { useCaptionCommands } from "../hooks/useCaptionCommands";
@@ -8,10 +8,32 @@ import type { useClipRegionCommands } from "../hooks/useClipRegionCommands";
 import type { useEditorPlaybackControls } from "../hooks/useEditorPlaybackControls";
 import type { useTimelineProjection } from "../hooks/useTimelineProjection";
 import type { useZoomRegionCommands } from "../hooks/useZoomRegionCommands";
+import type { PlaybackClockStore } from "../state/playbackClockStore";
 import type { useTimelineState } from "../state/useTimelineState";
 import type { ZoomPresentationOptions } from "../timeline/core/zoomPresentation";
 import TimelineEditor, { type TimelineEditorHandle } from "../timeline/TimelineEditor";
 import type { VideoPlaybackRef } from "../VideoPlayback";
+
+const noopSubscribe = () => () => undefined;
+
+function resolveSelectedCaptionFragmentId(
+	effectiveCaptionRegions: ReturnType<typeof projectCaptionCues>,
+	selectedCaptionId: string | null,
+	timeSec: number,
+): string | null {
+	if (!selectedCaptionId) return null;
+	const timeMs = timeSec * 1000;
+	return (
+		effectiveCaptionRegions.find(
+			(cue) =>
+				cue.sourceCueId === selectedCaptionId &&
+				timeMs >= cue.startMs &&
+				timeMs < cue.endMs,
+		)?.id ??
+		effectiveCaptionRegions.find((cue) => cue.sourceCueId === selectedCaptionId)?.id ??
+		null
+	);
+}
 
 type Props = {
 	zoomPresentationOptions?: ZoomPresentationOptions;
@@ -31,7 +53,8 @@ type Props = {
 	videoSourcePath: string | null;
 	cursorTelemetrySourcePath: string | null;
 	normalizedCursorTelemetry: ReturnType<typeof useTimelineState>["cursorTelemetry"];
-	currentTime: number;
+	playbackClock?: PlaybackClockStore;
+	currentTime?: number;
 	handleSelectAnnotation: (id: string | null) => void;
 };
 
@@ -51,9 +74,33 @@ export function EditorTimelinePanel(props: Props) {
 		videoSourcePath,
 		cursorTelemetrySourcePath,
 		normalizedCursorTelemetry,
-		currentTime,
+		playbackClock,
+		currentTime = 0,
 		handleSelectAnnotation,
 	} = props;
+
+	const subscribeSelectedCaption = useCallback(
+		(listener: () => void) =>
+			timeline.selectedCaptionId && playbackClock
+				? playbackClock.subscribe(listener)
+				: noopSubscribe(),
+		[playbackClock, timeline.selectedCaptionId],
+	);
+	const selectedCaptionFragmentId = useSyncExternalStore(
+		subscribeSelectedCaption,
+		() =>
+			resolveSelectedCaptionFragmentId(
+				projection.effectiveCaptionRegions,
+				timeline.selectedCaptionId,
+				playbackClock ? playbackClock.getTimelineTime() : currentTime,
+			),
+		() =>
+			resolveSelectedCaptionFragmentId(
+				projection.effectiveCaptionRegions,
+				timeline.selectedCaptionId,
+				currentTime,
+			),
+	);
 
 	return (
 		<div
@@ -68,6 +115,7 @@ export function EditorTimelinePanel(props: Props) {
 				ref={timelineRef}
 				videoDuration={projection.timelineDuration}
 				sourceDuration={projection.sourceDuration}
+				playbackClock={playbackClock}
 				currentTime={currentTime}
 				playheadTime={projection.timelinePlayheadTime}
 				onSeek={playback.handleTimelineSeek}
@@ -108,18 +156,7 @@ export function EditorTimelinePanel(props: Props) {
 						retimeCaptionFragment(fragment, span),
 					);
 				}}
-				selectedCaptionId={
-					projection.effectiveCaptionRegions.find(
-						(cue) =>
-							cue.sourceCueId === timeline.selectedCaptionId &&
-							currentTime * 1000 >= cue.startMs &&
-							currentTime * 1000 < cue.endMs,
-					)?.id ??
-					projection.effectiveCaptionRegions.find(
-						(cue) => cue.sourceCueId === timeline.selectedCaptionId,
-					)?.id ??
-					null
-				}
+				selectedCaptionId={selectedCaptionFragmentId}
 				onSelectCaption={(id) => {
 					const fragment = projection.effectiveCaptionRegions.find(
 						(cue) => cue.id === id,
@@ -151,10 +188,9 @@ export function EditorTimelinePanel(props: Props) {
 				onSelectAnnotation={(id) => {
 					handleSelectAnnotation(id);
 					const region = timeline.annotationRegions.find((region) => region.id === id);
-					if (
-						region &&
-						(currentTime * 1000 < region.startMs || currentTime * 1000 >= region.endMs)
-					) {
+					const nowMs =
+						(playbackClock ? playbackClock.getTimelineTime() : currentTime) * 1000;
+					if (region && (nowMs < region.startMs || nowMs >= region.endMs)) {
 						playback.handleTimelineSeek(
 							(region.startMs + Math.min(1, (region.endMs - region.startMs) / 2)) /
 								1000,

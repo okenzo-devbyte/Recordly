@@ -10,6 +10,7 @@ interface CaptionListPanelProps {
 	cues: CaptionCue[];
 	selectedCaptionId: string | null;
 	currentTimeMs: number;
+	getCurrentTimeMs?: () => number;
 	onBeginCaptionEdit: (id: string) => void;
 	onCaptionTextEdit: (id: string, text: string) => void;
 	onCaptionRetime: (id: string, span: CaptionRetimeSpan) => void;
@@ -45,6 +46,7 @@ interface CaptionEditorProps {
 	cue: CaptionCue;
 	canMerge: boolean;
 	currentTimeMs: number;
+	getCurrentTimeMs?: () => number;
 	onBeginEdit: (id: string) => void;
 	onTextEdit: (id: string, text: string) => void;
 	onRetime: (id: string, span: CaptionRetimeSpan) => void;
@@ -57,6 +59,7 @@ function CaptionEditor({
 	cue,
 	canMerge,
 	currentTimeMs,
+	getCurrentTimeMs,
 	onBeginEdit,
 	onTextEdit,
 	onRetime,
@@ -176,9 +179,10 @@ function CaptionEditor({
 				<Button
 					variant="ghost"
 					type="button"
-					onClick={() =>
-						onSplit(cue.id, clampNumber(currentTimeMs, cue.startMs, cue.endMs))
-					}
+					onClick={() => {
+						const atMs = getCurrentTimeMs ? getCurrentTimeMs() : currentTimeMs;
+						onSplit(cue.id, clampNumber(atMs, cue.startMs, cue.endMs));
+					}}
 					className="flex h-9 items-center justify-center gap-1.5 text-xs"
 				>
 					<Scissors className="h-4 w-4" />
@@ -213,6 +217,7 @@ export default function CaptionListPanel({
 	cues,
 	selectedCaptionId,
 	currentTimeMs,
+	getCurrentTimeMs,
 	onBeginCaptionEdit,
 	onCaptionTextEdit,
 	onCaptionRetime,
@@ -234,6 +239,7 @@ export default function CaptionListPanel({
 			cue={cue}
 			canMerge={canMerge}
 			currentTimeMs={currentTimeMs}
+			getCurrentTimeMs={getCurrentTimeMs}
 			onBeginEdit={onBeginCaptionEdit}
 			onTextEdit={onCaptionTextEdit}
 			onRetime={onCaptionRetime}

@@ -1,5 +1,14 @@
 import fs from "node:fs/promises";
-import { parseJsonWithByteOrderMark } from "../utils";
+import type {
+	CaptureFpsOption,
+	CaptureMaxResolution,
+	PerformanceMode,
+} from "../../../src/shared/performanceProfile";
+
+function parseJsonWithByteOrderMark<T = unknown>(content: string): T {
+	const stripped = content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
+	return JSON.parse(stripped) as T;
+}
 
 export interface RecordingPreferencesPatch {
 	microphoneEnabled?: boolean;
@@ -7,6 +16,9 @@ export interface RecordingPreferencesPatch {
 	systemAudioEnabled?: boolean;
 	webcamEnabled?: boolean;
 	webcamDeviceId?: string;
+	performanceMode?: PerformanceMode;
+	captureMaxResolution?: CaptureMaxResolution;
+	captureFps?: CaptureFpsOption;
 }
 
 export function createRecordingPreferencesStore(filePath: string) {

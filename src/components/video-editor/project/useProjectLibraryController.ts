@@ -4,7 +4,7 @@ import {
 	captureProjectThumbnailCanvas,
 	getProjectThumbnailRenderSize,
 } from "@/lib/projectThumbnailCanvas";
-import { FrameRenderer } from "@/lib/exporter/frameRenderer";
+import { FrameRenderer } from "@/lib/exporter/modernFrameRenderer";
 import { toFileUrl } from "../projectPersistence";
 import type { useAppearanceState } from "../state/useAppearanceState";
 import type { useProjectState } from "../state/useProjectState";
@@ -18,7 +18,7 @@ type Input = {
 	appearance: ReturnType<typeof useAppearanceState>;
 	timeline: ReturnType<typeof useTimelineState>;
 	videoPlaybackRef: RefObject<VideoPlaybackRef | null>;
-	currentTime: number;
+	currentTime?: number;
 	effectiveShowCursor: boolean;
 };
 
@@ -179,6 +179,7 @@ export function useProjectLibraryController({
 				}
 				frameRenderer = new FrameRenderer({
 					timelineEffects: true,
+					preferMediaElementSampling: true,
 					...renderSize,
 					wallpaper,
 					zoomRegions,

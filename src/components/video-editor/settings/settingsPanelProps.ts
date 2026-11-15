@@ -5,6 +5,7 @@ import type {
 	AnnotationType,
 	AutoCaptionSettings,
 	CaptionCue,
+	ClipRegion,
 	CropRegion,
 	CursorClickEffectStyle,
 	CursorStyle,
@@ -18,6 +19,7 @@ import type {
 } from "@/components/video-editor/types";
 import type { CaptionModelId } from "@/shared/captionModels";
 import { type AspectRatio } from "@/utils/aspectRatioUtils";
+import type { PlaybackClockStore } from "../state/playbackClockStore";
 import type { CursorIdleHideSettings } from "../videoPlayback/cursorIdleVisibility";
 
 export interface SettingsPanelProps {
@@ -121,6 +123,8 @@ export interface SettingsPanelProps {
 	webcamPreviewSrc?: string | null;
 	webcamPreviewCurrentTime?: number;
 	webcamPreviewPlaying?: boolean;
+	playbackClock?: PlaybackClockStore;
+	clipRegions?: ClipRegion[];
 	onWebcamChange?: (webcam: WebcamOverlaySettings) => void;
 	onUploadWebcam?: () => void;
 	onClearWebcam?: () => void;
@@ -156,6 +160,7 @@ export interface SettingsPanelProps {
 	onClearAutoCaptions?: () => void;
 	onDeleteWhisperSmallModel?: () => void;
 	captionCurrentTimeMs?: number;
+	getCaptionCurrentTimeMs?: () => number;
 	selectedCaptionId?: string | null;
 	onBeginCaptionEdit?: (id: string) => void;
 	onCaptionTextEdit?: (id: string, text: string) => void;

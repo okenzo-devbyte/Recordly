@@ -14,6 +14,14 @@ import {
 	createRecordingPreferencesStore,
 	type RecordingPreferencesPatch,
 } from "../settings/recordingPreferencesStore";
+import { getSystemHardwareProfile } from "../system/hardwareProfile";
+import {
+	normalizeCaptureFps,
+	normalizeCaptureMaxResolution,
+	normalizePerformanceMode,
+	normalizePerformancePreferences,
+	type PerformancePreferences,
+} from "../../../src/shared/performanceProfile";
 import {
 	countdownInProgress,
 	countdownRemaining,
@@ -194,6 +202,72 @@ export function registerSettingsHandlers() {
 			return { success: false, error: String(error) };
 		}
 	});
+
+	ipcMain.handle("get-system-hardware-profile", async () => {
+		try {
+			const profile = await getSystemHardwareProfile();
+			return { success: true, profile };
+		} catch (error) {
+			return { success: false, error: String(error) };
+		}
+	});
+
+	ipcMain.handle("get-performance-preferences", async () => {
+		try {
+			const parsed = await recordingPreferencesStore.read();
+			return {
+				success: true,
+				...normalizePerformancePreferences(parsed),
+			};
+		} catch {
+			return {
+				success: true,
+				...normalizePerformancePreferences(null),
+			};
+		}
+	});
+
+	ipcMain.handle(
+		"set-performance-preferences",
+		async (_, patch: Partial<PerformancePreferences>) => {
+			try {
+				const sanitized: Partial<PerformancePreferences> = {};
+				if (patch?.performanceMode !== undefined) {
+					sanitized.performanceMode = normalizePerformanceMode(patch.performanceMode);
+				}
+				if (patch?.captureMaxResolution !== undefined) {
+					sanitized.captureMaxResolution = normalizeCaptureMaxResolution(
+						patch.captureMaxResolution,
+					);
+				}
+				if (patch?.captureFps !== undefined) {
+					sanitized.captureFps = normalizeCaptureFps(patch.captureFps);
+				}
+				if (Object.keys(sanitized).length > 0) {
+					await recordingPreferencesStore.update(sanitized);
+				}
+				const current = normalizePerformancePreferences(
+					await recordingPreferencesStore.read(),
+				);
+				for (const win of BrowserWindow.getAllWindows()) {
+					if (win.isDestroyed() || win.webContents.isDestroyed()) continue;
+					try {
+						win.webContents.send("performance-preferences-changed", current);
+					} catch {
+						// best effort broadcast
+					}
+				}
+				return { success: true, ...current };
+			} catch (error) {
+				console.error("Failed to save performance preferences:", error);
+				return {
+					success: false,
+					error: String(error),
+					...normalizePerformancePreferences(null),
+				};
+			}
+		},
+	);
 
 	ipcMain.handle("get-countdown-delay", async () => {
 		try {

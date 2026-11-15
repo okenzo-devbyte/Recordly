@@ -172,5 +172,7 @@
 	"mergeClipsUnavailable": "Merge requires continuous footage with matching speed and audio settings.",
 	"mergeClips": "Merge clips",
 	"captionStyleClassic": "Classic",
-	"captionStyleReveal": "Reveal"
+	"captionStyleReveal": "Reveal",
+	"captionLanguageth": "Thai",
+	"parakeetLanguageRequiresWhisper": "Selected language requires Whisper Base or Whisper Small. Parakeet supports European languages only."
 }

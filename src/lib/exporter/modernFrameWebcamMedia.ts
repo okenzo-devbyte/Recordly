@@ -132,23 +132,25 @@ export class FrameWebcamMedia {
 
 		if (!this.context.config.webcam?.enabled || !webcamUrl) return;
 
-		const frameSource = new WebcamFrameSource(
-			webcamUrl,
-			this.context.config.webcam.loop === true,
-		);
-		try {
-			await frameSource.initialize();
-			this.webcamForwardFrameSource = frameSource;
-			this.webcamVideoElement = null;
-			this.webcamSeekPromise = null;
-			this.lastSyncedWebcamTime = null;
-			return;
-		} catch (error) {
-			await frameSource.destroy();
-			console.warn(
-				"[FrameRenderer] Decoder-backed webcam source unavailable during export; falling back to media element sync:",
-				error,
+		if (!this.context.config.preferMediaElementSampling) {
+			const frameSource = new WebcamFrameSource(
+				webcamUrl,
+				this.context.config.webcam.loop === true,
 			);
+			try {
+				await frameSource.initialize();
+				this.webcamForwardFrameSource = frameSource;
+				this.webcamVideoElement = null;
+				this.webcamSeekPromise = null;
+				this.lastSyncedWebcamTime = null;
+				return;
+			} catch (error) {
+				await frameSource.destroy();
+				console.warn(
+					"[FrameRenderer] Decoder-backed webcam source unavailable during export; falling back to media element sync:",
+					error,
+				);
+			}
 		}
 
 		await this.loadWebcamMediaElementSource(webcamUrl);

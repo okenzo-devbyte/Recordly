@@ -1,15 +1,11 @@
 import { type MutableRefObject, useCallback, useRef } from "react";
 import { toast } from "@/components/ui/toast";
 import { translate } from "@/i18n/runtime";
+import { ensurePerformanceProfileLoaded, getPerformanceBudgetSnapshot } from "@/lib/performanceProfileStore";
 import { getErrorMessage } from "./recordingError";
 import { RecordingFileWriter } from "./recordingFileWriter";
 import { getVideoExtensionForMimeType, selectWebcamRecordingMimeType } from "./recordingMimeType";
 
-const WEBCAM_BITRATE = 8_000_000;
-const WEBCAM_WIDTH = 1280;
-const WEBCAM_HEIGHT = 720;
-const WEBCAM_FRAME_RATE = 60;
-const RECORDER_TIMESLICE_MS = 250;
 const RECORDING_FILE_PREFIX = "recording-";
 const WEBCAM_SUFFIX = "-webcam";
 
@@ -32,6 +28,7 @@ export function useRecorderWebcam({
 	const webcamWriter = useRef<RecordingFileWriter | null>(null);
 	const webcamStartTime = useRef<number | null>(null);
 	const webcamTimeOffsetMs = useRef(0);
+	const webcamTimesliceRef = useRef<number>(getPerformanceBudgetSnapshot().recording.timesliceMs);
 	const pendingWebcamPathPromise = useRef<Promise<string | null> | null>(null);
 	const webcamStopPromise = useRef<Promise<string | null> | null>(null);
 	const webcamStopResolver = useRef<((path: string | null) => void) | null>(null);
@@ -80,25 +77,30 @@ export function useRecorderWebcam({
 		}
 
 		try {
+			const budget = await ensurePerformanceProfileLoaded();
+			const { webcamWidth, webcamHeight, webcamFps, webcamBitrate, timesliceMs } =
+				budget.recording;
+			webcamTimesliceRef.current = timesliceMs;
+
 			webcamStream.current = await navigator.mediaDevices.getUserMedia({
 				video: webcamDeviceId
 					? {
 							deviceId: { exact: webcamDeviceId },
-							width: { ideal: WEBCAM_WIDTH },
-							height: { ideal: WEBCAM_HEIGHT },
-							frameRate: { ideal: WEBCAM_FRAME_RATE, max: WEBCAM_FRAME_RATE },
+							width: { ideal: webcamWidth },
+							height: { ideal: webcamHeight },
+							frameRate: { ideal: webcamFps, max: webcamFps },
 						}
 					: {
-							width: { ideal: WEBCAM_WIDTH },
-							height: { ideal: WEBCAM_HEIGHT },
-							frameRate: { ideal: WEBCAM_FRAME_RATE, max: WEBCAM_FRAME_RATE },
+							width: { ideal: webcamWidth },
+							height: { ideal: webcamHeight },
+							frameRate: { ideal: webcamFps, max: webcamFps },
 						},
 				audio: false,
 			});
 
 			const settings = webcamStream.current.getVideoTracks?.()[0]?.getSettings?.();
 			console.info("[Recorder] Webcam capture settings", {
-				requestedFrameRate: WEBCAM_FRAME_RATE,
+				requestedFrameRate: webcamFps,
 				frameRate: settings?.frameRate ?? null,
 				width: settings?.width ?? null,
 				height: settings?.height ?? null,
@@ -114,7 +116,7 @@ export function useRecorderWebcam({
 			pendingWebcamPathPromise.current = webcamStopPromise.current;
 
 			const recorder = new MediaRecorder(webcamStream.current, {
-				videoBitsPerSecond: WEBCAM_BITRATE,
+				videoBitsPerSecond: webcamBitrate,
 				...(mimeType ? { mimeType } : {}),
 			});
 
@@ -195,7 +197,7 @@ export function useRecorderWebcam({
 		const recorder = webcamRecorder.current;
 		if (recorder && recorder.state === "inactive") {
 			webcamStartTime.current = Date.now();
-			recorder.start(RECORDER_TIMESLICE_MS);
+			recorder.start(webcamTimesliceRef.current);
 		}
 	}, []);
 

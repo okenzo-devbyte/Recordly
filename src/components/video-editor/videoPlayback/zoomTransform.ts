@@ -96,6 +96,48 @@ function resetMotionEffects(
 	}
 }
 
+export function syncVideoBlurFilters(params: {
+	videoEffectsContainer?: Container | null;
+	zoomBlurFilter?: ZoomBlurFilter | null;
+	motionBlurFilter?: MotionBlurFilter | null;
+	motionBlurAmount?: number;
+}): boolean {
+	const {
+		videoEffectsContainer,
+		zoomBlurFilter,
+		motionBlurFilter,
+		motionBlurAmount = 0,
+	} = params;
+	if (!videoEffectsContainer || !motionBlurFilter || !zoomBlurFilter) {
+		return false;
+	}
+
+	const blurEnabled = Number.isFinite(motionBlurAmount) && motionBlurAmount > 0;
+	const hasMotionVelocity =
+		Math.abs(motionBlurFilter.velocity?.x ?? 0) > 1e-4 ||
+		Math.abs(motionBlurFilter.velocity?.y ?? 0) > 1e-4;
+	const hasZoomStrength = (zoomBlurFilter.strength ?? 0) > 1e-4;
+	const shouldAttach = blurEnabled && (hasMotionVelocity || hasZoomStrength);
+
+	if (shouldAttach) {
+		const current = videoEffectsContainer.filters;
+		if (
+			!Array.isArray(current) ||
+			current.length !== 2 ||
+			current[0] !== motionBlurFilter ||
+			current[1] !== zoomBlurFilter
+		) {
+			videoEffectsContainer.filters = [motionBlurFilter, zoomBlurFilter];
+		}
+		return true;
+	}
+
+	if (videoEffectsContainer.filters !== null && videoEffectsContainer.filters.length > 0) {
+		videoEffectsContainer.filters = null;
+	}
+	return false;
+}
+
 function resolveMotionBlurTuning(motionBlurTuning?: ZoomMotionBlurTuning): ZoomMotionBlurTuning {
 	if (!motionBlurTuning) {
 		return DEFAULT_ZOOM_MOTION_BLUR_TUNING;

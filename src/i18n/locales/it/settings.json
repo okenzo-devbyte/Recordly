@@ -598,5 +598,40 @@
 	},
 	"annotation": {
 		"delete": "Elimina annotazione"
+	},
+	"performance": {
+		"title": "Prestazioni",
+		"hardwareSummary": "{{cores}} core · {{memory}} GB RAM · {{encoder}}",
+		"hwEncoderReady": "Encoder HW pronto",
+		"cpuEncoderOnly": "Solo encoder CPU",
+		"recommendedLabel": "Consigliato: {{tier}}",
+		"mode": "Modalità prestazioni",
+		"modeDescription": "Adatta automaticamente l’uso di risorse per acquisizione, anteprima ed esportazione o blocca un preset.",
+		"modes": {
+			"auto": "Auto ({{tier}})",
+			"low": "Eco (PC leggeri)",
+			"balanced": "Bilanciato",
+			"high": "Alta qualità"
+		},
+		"tiers": {
+			"low": "Eco",
+			"balanced": "Bilanciato",
+			"high": "Alto"
+		},
+		"captureResolution": "Risoluzione acquisizione",
+		"captureResolutionDescription": "Limita la risoluzione di registrazione per ridurre carico CPU, memoria e disco sui PC meno potenti.",
+		"resolutions": {
+			"auto": "Auto",
+			"1080p": "1080p",
+			"native": "Nativa"
+		},
+		"captureFps": "FPS acquisizione",
+		"captureFpsDescription": "Usa 30 FPS per un multitasking più fluido su PC a 4–8 core o 60 FPS per la massima nitidezza.",
+		"fpsOptions": {
+			"auto": "Auto",
+			"30": "30 FPS",
+			"60": "60 FPS"
+		},
+		"saveFailed": "Impossibile salvare le impostazioni di prestazione."
 	}
 }

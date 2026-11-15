@@ -1,17 +1,34 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { mapTimelineTimeToSourceTime } from "../types";
 import { createClipPlayback, findPreviewClipAtTimelineTime } from "./clipPlayback";
 import type { PlaybackProps } from "./playbackProps";
 import { PreviewVideoSource } from "./previewVideoSource";
 import type { createPreviewRenderLoop } from "./previewRenderLoop";
 import { usePreviewVideoReady } from "./usePreviewVideoReady";
+
+const noopSubscribe = () => () => undefined;
+
 export function usePreviewMediaState(
 	input: Pick<
 		PlaybackProps,
-		"videoPath" | "timelineTime" | "clipRegions" | "onError" | "isPlaying" | "suspendRendering"
+		| "videoPath"
+		| "timelineTime"
+		| "playbackClock"
+		| "clipRegions"
+		| "onError"
+		| "isPlaying"
+		| "suspendRendering"
 	>,
 ) {
-	const { videoPath, timelineTime, clipRegions, onError, isPlaying, suspendRendering } = input;
+	const {
+		videoPath,
+		timelineTime,
+		playbackClock,
+		clipRegions,
+		onError,
+		isPlaying,
+		suspendRendering,
+	} = input;
 
 	const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -31,9 +48,17 @@ export function usePreviewMediaState(
 
 	const videoReady = usePreviewVideoReady(videoRef, videoPath);
 
-	const currentTime = mapTimelineTimeToSourceTime(timelineTime * 1000, clipRegions) / 1000;
+	const initialTimelineTime = playbackClock ? playbackClock.getTimelineTime() : timelineTime;
+	const currentTime = mapTimelineTimeToSourceTime(initialTimelineTime * 1000, clipRegions) / 1000;
 
-	const isGap = !findPreviewClipAtTimelineTime(timelineTime * 1000, clipRegions);
+	const isGap = useSyncExternalStore(
+		playbackClock ? playbackClock.subscribe : noopSubscribe,
+		() =>
+			!findPreviewClipAtTimelineTime(
+				(playbackClock ? playbackClock.getTimelineTime() : timelineTime) * 1000,
+				clipRegions,
+			),
+	);
 
 	const clipRegionsRef = useRef(clipRegions);
 
@@ -41,14 +66,19 @@ export function usePreviewMediaState(
 
 	const onPlaybackErrorRef = useRef(onError);
 
-	const timelineTimeRef = useRef(timelineTime);
+	const timelineTimeRef = useRef(initialTimelineTime);
 
 	useEffect(() => {
 		onPlaybackErrorRef.current = onError;
-		timelineTimeRef.current = timelineTime;
-	}, [onError, timelineTime]);
+	}, [onError]);
 
-	const currentTimeRef = useRef(0);
+	useEffect(() => {
+		if (!playbackClock) {
+			timelineTimeRef.current = timelineTime;
+		}
+	}, [playbackClock, timelineTime]);
+
+	const currentTimeRef = useRef(currentTime * 1000);
 
 	useEffect(() => {
 		clipRegionsRef.current = clipRegions;

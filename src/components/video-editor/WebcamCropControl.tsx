@@ -3,7 +3,8 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useScopedT } from "@/contexts/I18nContext";
 import { cn } from "@/lib/utils";
-import type { CropRegion } from "./types";
+import { type ClipRegion, type CropRegion, mapTimelineTimeToSourceTime } from "./types";
+import type { PlaybackClockStore } from "./state/playbackClockStore";
 import {
 	getWebcamPreviewTargetTimeSeconds,
 	isWebcamMediaSynchronized,
@@ -19,6 +20,8 @@ interface WebcamCropControlProps {
 	previewCurrentTime?: number;
 	previewPlaying?: boolean;
 	previewTimeOffsetMs?: number | null;
+	playbackClock?: PlaybackClockStore;
+	clipRegions?: ClipRegion[];
 	onCropChange: (cropRegion: CropRegion, previewFrame?: PreviewFrame | null) => void;
 }
 
@@ -127,6 +130,8 @@ export function WebcamCropControl({
 	previewCurrentTime = 0,
 	previewPlaying = false,
 	previewTimeOffsetMs = 0,
+	playbackClock,
+	clipRegions = [],
 	onCropChange,
 }: WebcamCropControlProps) {
 	const te = useScopedT("editing");
@@ -175,9 +180,13 @@ export function WebcamCropControl({
 			return;
 		}
 
+		const resolvedPreviewCurrentTime = playbackClock
+			? mapTimelineTimeToSourceTime(playbackClock.getTimelineTime() * 1000, clipRegions) /
+				1000
+			: previewCurrentTime;
 		const webcamDuration = Number.isFinite(video.duration) ? video.duration : null;
 		const targetTime = getWebcamPreviewTargetTimeSeconds({
-			currentTime: previewCurrentTime,
+			currentTime: resolvedPreviewCurrentTime,
 			webcamDuration,
 			timeOffsetMs: previewTimeOffsetMs,
 		});
@@ -232,7 +241,9 @@ export function WebcamCropControl({
 		} else {
 			video.pause();
 		}
-	}, [previewCurrentTime, previewPlaying, previewSrc, previewTimeOffsetMs]);
+	}, [clipRegions, playbackClock, previewCurrentTime, previewPlaying, previewSrc, previewTimeOffsetMs]);
+	const syncPreviewMediaRef = useRef(syncPreviewMedia);
+	syncPreviewMediaRef.current = syncPreviewMedia;
 
 	const handlePreviewFrameReady = useCallback(() => {
 		const video = previewVideoRef.current;
@@ -249,6 +260,15 @@ export function WebcamCropControl({
 	useEffect(() => {
 		syncPreviewMedia();
 	}, [syncPreviewMedia]);
+
+	useEffect(() => {
+		if (!playbackClock) {
+			return;
+		}
+		return playbackClock.subscribe(() => {
+			syncPreviewMediaRef.current();
+		});
+	}, [playbackClock]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: The source identity intentionally resets cached synchronization state.
 	useEffect(() => {

@@ -1,5 +1,7 @@
 import { BrowserWindow } from "electron";
 import { type AuthFlowStorageHooks, registerAuthStorageHandlers } from "../authStorage";
+import { registerWaveformHandlers } from "./audio/waveform";
+import { registerFilmstripHandlers } from "./filmstrip/extract";
 import { registerAnnouncementHandlers } from "./register/announcements";
 import { registerAssetHandlers } from "./register/assets";
 import { registerCaptionHandlers } from "./register/captions";
@@ -78,6 +80,8 @@ export function registerIpcHandlers(
 	registerClipboardHandlers();
 	registerAnnouncementHandlers();
 	registerAssetHandlers();
+	registerWaveformHandlers();
+	registerFilmstripHandlers();
 	registerExportHandlers();
 	registerGifOptimizationHandlers();
 	registerExportDiagnosticHandlers();

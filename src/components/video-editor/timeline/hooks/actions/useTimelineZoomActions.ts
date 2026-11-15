@@ -9,7 +9,8 @@ interface UseTimelineZoomActionsParams {
 	timeline: {
 		videoDuration: number;
 		totalMs: number;
-		currentTimeMs: number;
+		currentTimeMs?: number;
+		getCurrentTimeMs?: () => number;
 	};
 	regions: {
 		zoom: ZoomRegion[];
@@ -27,7 +28,7 @@ export function useTimelineZoomActions({
 	onZoomAdded,
 	onZoomSuggested,
 }: UseTimelineZoomActionsParams) {
-	const { videoDuration, totalMs, currentTimeMs } = timeline;
+	const { videoDuration, totalMs, currentTimeMs = 0, getCurrentTimeMs } = timeline;
 	const { zoom: zoomRegions, clip: clipRegions } = regions;
 	const defaultRegionDurationMs = useMemo(() => Math.min(1000, totalMs), [totalMs]);
 	const defaultZoomDurationMs = Math.min(DEFAULT_ZOOM_BLOCK_DURATION_MS, totalMs);
@@ -97,8 +98,8 @@ export function useTimelineZoomActions({
 			return;
 		}
 
-		addZoomAtMs(currentTimeMs);
-	}, [videoDuration, totalMs, currentTimeMs, addZoomAtMs]);
+		addZoomAtMs(getCurrentTimeMs ? getCurrentTimeMs() : currentTimeMs);
+	}, [videoDuration, totalMs, currentTimeMs, getCurrentTimeMs, addZoomAtMs]);
 
 	const handleSuggestZooms = useCallback(() => {
 		if (!videoDuration || videoDuration === 0 || totalMs === 0) {

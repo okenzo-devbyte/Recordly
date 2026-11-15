@@ -2,7 +2,14 @@ import fs from "node:fs/promises";
 import { type WebContents } from "electron";
 import { type NativeVideoExportSession } from "./types";
 
-export function getNativeVideoExportMaxQueuedWriteBytes(inputByteSize: number) {
+export function getNativeVideoExportMaxQueuedWriteBytes(
+	inputByteSize: number,
+	options?: { lowMemory?: boolean },
+) {
+	if (options?.lowMemory) {
+		if (inputByteSize === 0) return 4 * 1024 * 1024;
+		return Math.min(16 * 1024 * 1024, Math.max(4 * 1024 * 1024, inputByteSize * 2));
+	}
 	if (inputByteSize === 0) return 8 * 1024 * 1024;
 	return Math.min(64 * 1024 * 1024, Math.max(16 * 1024 * 1024, inputByteSize * 4));
 }

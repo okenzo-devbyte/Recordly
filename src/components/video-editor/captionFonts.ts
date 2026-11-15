@@ -1,3 +1,4 @@
+import notoSansThaiUrl from "@/assets/fonts/noto-sans-thai/NotoSansThai-Variable.ttf?url";
 import tikTokSansUrl from "@/assets/fonts/tiktok-sans/TikTokSans-Variable.ttf?url";
 import { getCaptionPreset } from "./captionPresets";
 import { type AutoCaptionSettings, getDefaultCaptionFontFamily } from "./types";
@@ -5,6 +6,23 @@ import { type AutoCaptionSettings, getDefaultCaptionFontFamily } from "./types";
 type CaptionFontSettings = Pick<AutoCaptionSettings, "style" | "fontFamily">;
 
 export const TIKTOK_CAPTION_FONT_NAME = "TikTok Sans";
+export const THAI_CAPTION_FONT_NAME = "Noto Sans Thai";
+
+const THAI_SCRIPT_PATTERN = /[\u0E00-\u0E7F]/;
+
+export function containsThaiCharacters(text?: string | null): boolean {
+	return Boolean(text && THAI_SCRIPT_PATTERN.test(text));
+}
+
+export function withCaptionThaiFallback(fontFamily: string, sampleText?: string | null): string {
+	if (!containsThaiCharacters(sampleText)) {
+		return fontFamily;
+	}
+	if (fontFamily.toLowerCase().includes(THAI_CAPTION_FONT_NAME.toLowerCase())) {
+		return fontFamily;
+	}
+	return `${fontFamily}, "${THAI_CAPTION_FONT_NAME}"`;
+}
 
 export function getCaptionFontFamily(
 	settings?: CaptionFontSettings,
@@ -18,6 +36,7 @@ export function getCaptionFontFamily(
 }
 
 let tikTokFontReady: Promise<void> | undefined;
+let thaiFontReady: Promise<void> | undefined;
 
 /** Await before measuring/rasterizing TikTok captions; no runtime network font request. */
 export function ensureCaptionFontLoaded(settings?: CaptionFontSettings): Promise<void> {
@@ -42,4 +61,26 @@ export function ensureCaptionFontLoaded(settings?: CaptionFontSettings): Promise
 		throw error;
 	});
 	return tikTokFontReady;
+}
+
+/** Load bundled Noto Sans Thai when rendering Thai glyphs on canvas or in DOM overlays. */
+export function ensureCaptionThaiFallbackLoaded(): Promise<void> {
+	if (thaiFontReady) return thaiFontReady;
+	if (typeof document === "undefined" || typeof FontFace === "undefined" || !document.fonts) {
+		return Promise.resolve();
+	}
+	const fonts = document.fonts;
+	thaiFontReady = (async () => {
+		const face = new FontFace(THAI_CAPTION_FONT_NAME, `url("${notoSansThaiUrl}")`, {
+			style: "normal",
+			weight: "100 900",
+			unicodeRange: "U+E00-E7F, U+200C-200D, U+25CC",
+		});
+		const loaded = await face.load();
+		fonts.add(loaded);
+	})().catch((error: unknown) => {
+		thaiFontReady = undefined;
+		throw error;
+	});
+	return thaiFontReady;
 }

@@ -77,6 +77,7 @@ export type usePlaybackOptionEffectsInput = Pick<
 	| "cursorSway"
 	| "currentTime"
 	| "currentTimeRef"
+	| "playbackClock"
 >;
 export function usePlaybackOptionEffects(input: usePlaybackOptionEffectsInput) {
 	const {
@@ -153,6 +154,7 @@ export function usePlaybackOptionEffects(input: usePlaybackOptionEffectsInput) {
 		cursorSway,
 		currentTime,
 		currentTimeRef,
+		playbackClock,
 	} = input;
 
 	useEffect(() => {
@@ -289,8 +291,9 @@ export function usePlaybackOptionEffects(input: usePlaybackOptionEffectsInput) {
 		}
 
 		motionBlurStateRef.current = createMotionBlurState();
-		videoEffectsContainer.filters =
-			zoomMotionBlur > 0 ? [motionBlurFilter, zoomBlurFilter] : null;
+		if (zoomMotionBlur <= 0) {
+			videoEffectsContainer.filters = null;
+		}
 	}, [
 		zoomMotionBlur,
 		requestPausedFrameRefresh,
@@ -357,8 +360,9 @@ export function usePlaybackOptionEffects(input: usePlaybackOptionEffectsInput) {
 	}, [cursorSway, requestPausedFrameRefresh, cursorSwayRef]);
 
 	useEffect(() => {
+		if (playbackClock) return;
 		const timeMs = currentTime * 1000;
 		currentTimeRef.current = timeMs;
-	}, [currentTime, currentTimeRef]);
+	}, [playbackClock, currentTime, currentTimeRef]);
 	return {};
 }

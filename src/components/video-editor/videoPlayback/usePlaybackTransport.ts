@@ -1,6 +1,7 @@
 import { Graphics, Sprite, Texture } from "pixi.js";
 import { useEffect, useRef } from "react";
 import { destroyPixiContainer } from "@/lib/pixiApplicationLifecycle";
+import { mapTimelineTimeToSourceTime } from "../types";
 import { createClipPlayback, findPreviewClipAtTimelineTime } from "./clipPlayback";
 import { subscribePreviewReadiness } from "./previewReadiness";
 import type { PlaybackProps } from "./playbackProps";
@@ -32,6 +33,7 @@ export type usePlaybackTransportInput = Pick<
 	| "clipRegionsRef"
 	| "timelineTimeRef"
 	| "currentTimeRef"
+	| "playbackClock"
 	| "onTimeUpdate"
 	| "isPlayingRef"
 	| "onPlayStateChange"
@@ -68,6 +70,7 @@ export function usePlaybackTransport(input: usePlaybackTransportInput) {
 		clipRegionsRef,
 		timelineTimeRef,
 		currentTimeRef,
+		playbackClock,
 		onTimeUpdate,
 		isPlayingRef,
 		onPlayStateChange,
@@ -81,6 +84,9 @@ export function usePlaybackTransport(input: usePlaybackTransportInput) {
 	} = input;
 	const callbacksRef = useRef({ onTimeUpdate, onPlayStateChange, onPreviewReadyChange });
 	callbacksRef.current = { onTimeUpdate, onPlayStateChange, onPreviewReadyChange };
+	const playbackClockRef = useRef(playbackClock);
+	playbackClockRef.current = playbackClock;
+	const lastClockEmitTimelineRef = useRef<number | null>(null);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: A new media path must reset the persistent video element.
 	useEffect(() => {
@@ -231,8 +237,16 @@ export function usePlaybackTransport(input: usePlaybackTransportInput) {
 			},
 			onTime: (time, source) => {
 				timelineTimeRef.current = time;
-				if (source !== null) currentTimeRef.current = source * 1000;
-				callbacksRef.current.onTimeUpdate(time);
+				const resolvedSource =
+					source ??
+					mapTimelineTimeToSourceTime(time * 1000, clipRegionsRef.current) / 1000;
+				currentTimeRef.current = resolvedSource * 1000;
+				if (playbackClockRef.current) {
+					lastClockEmitTimelineRef.current = time;
+					playbackClockRef.current.setTime(time, resolvedSource);
+					lastClockEmitTimelineRef.current = null;
+				}
+				callbacksRef.current.onTimeUpdate?.(time);
 				requestPreviewRender();
 			},
 			onPlaying: (playing) => {
@@ -243,10 +257,29 @@ export function usePlaybackTransport(input: usePlaybackTransportInput) {
 				onPlaybackErrorRef.current(error instanceof Error ? error.message : String(error)),
 		});
 		clipPlaybackRef.current = transport;
-		transport.seek(timelineTimeRef.current);
+		const initialSeekTime = playbackClockRef.current
+			? playbackClockRef.current.getTimelineTime()
+			: timelineTimeRef.current;
+		timelineTimeRef.current = initialSeekTime;
+		transport.seek(initialSeekTime);
 		updatePreviewTexture();
 		if (autoPlay)
 			void transport.play().catch((error) => onPlaybackErrorRef.current(String(error)));
+
+		const unsubscribeClock = playbackClock?.subscribe(() => {
+			const nextTimeline = playbackClock.getTimelineTime();
+			if (
+				lastClockEmitTimelineRef.current !== null &&
+				Object.is(nextTimeline, lastClockEmitTimelineRef.current)
+			) {
+				lastClockEmitTimelineRef.current = null;
+				return;
+			}
+			if (Math.abs(nextTimeline - timelineTimeRef.current) > 1e-6) {
+				shouldSnapPausedFrameRef.current = true;
+				transport.seek(nextTimeline);
+			}
+		});
 		const handleSeeked = () => {
 			if (video.seeking) return;
 			// Pixi's default seek handler only updates paused videos. Scrubbing
@@ -268,6 +301,8 @@ export function usePlaybackTransport(input: usePlaybackTransportInput) {
 
 		return () => {
 			stopReadiness();
+			unsubscribeClock?.();
+			lastClockEmitTimelineRef.current = null;
 			if (updatePreviewTextureRef.current === updatePreviewTexture) {
 				updatePreviewTextureRef.current = null;
 			}
@@ -306,6 +341,7 @@ export function usePlaybackTransport(input: usePlaybackTransportInput) {
 		clipRegionsRef,
 		timelineTimeRef,
 		currentTimeRef,
+		playbackClock,
 		isPlayingRef,
 		onPlaybackErrorRef,
 		clipPlaybackRef,

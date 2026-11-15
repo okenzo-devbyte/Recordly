@@ -144,6 +144,16 @@ The complete license and font provenance are included in
 [src/assets/fonts/tiktok-sans/OFL.txt](src/assets/fonts/tiktok-sans/OFL.txt) and
 [src/assets/fonts/tiktok-sans/README.md](src/assets/fonts/tiktok-sans/README.md).
 
+## Noto Sans Thai
+
+Copyright 2022 The Noto Project Authors (https://github.com/notofonts/thai). Noto Sans Thai is
+licensed under the SIL Open Font License, Version 1.1. Recordly bundles the unmodified variable
+TrueType font sourced from
+[Google Fonts](https://github.com/google/fonts/tree/main/ofl/notosansthai) for Thai UI typography
+and caption rendering. The complete license and font provenance are included in
+[src/assets/fonts/noto-sans-thai/OFL.txt](src/assets/fonts/noto-sans-thai/OFL.txt) and
+[src/assets/fonts/noto-sans-thai/README.md](src/assets/fonts/noto-sans-thai/README.md).
+
 ## Community cursor themes
 
 Recordly bundles adaptations of the following independently licensed cursor themes:

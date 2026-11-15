@@ -10,6 +10,12 @@ import { SettingsCategory, SettingsSections } from "@/components/video-editor/Se
 import { useI18n } from "@/contexts/I18nContext";
 import type { AppLocale } from "@/i18n/config";
 import { SUPPORTED_LOCALES } from "@/i18n/config";
+import type {
+	CaptureFpsOption,
+	CaptureMaxResolution,
+	PerformanceMode,
+	ResolvedPerformanceTier,
+} from "@/shared/performanceProfile";
 
 import { DeveloperMotionSettings, developerMotionSettingsKeys } from "./DeveloperMotionSettings";
 import { MotionPresetCards } from "./MotionPresetCards";
@@ -32,6 +38,7 @@ const APP_LANGUAGE_LABELS: Record<AppLocale, string> = {
 	"pt-BR": "Português (Brasil)",
 	"zh-CN": "简体中文",
 	"zh-TW": "繁體中文",
+	th: "ภาษาไทย",
 };
 
 export const appSettingsKeys = [
@@ -64,6 +71,9 @@ export function AppSettings(props: Props) {
 		experimentalUpdatesEnabled,
 		savingExperimentalUpdates,
 		updateExperimentalUpdatesPreference,
+		performanceBudget,
+		savingPerformancePreferences,
+		updatePerformancePreferencesState,
 		activeMotionPresetId,
 		applyMotionPreset,
 		themePreference,
@@ -71,6 +81,34 @@ export function AppSettings(props: Props) {
 	} = props.app;
 	const { locale, setLocale } = useI18n();
 	const showDevMotionControls = import.meta.env.DEV;
+	const { hardware, preferences } = performanceBudget;
+	const recommendedTier = hardware?.recommendedTier ?? "balanced";
+	const tierLabels: Record<ResolvedPerformanceTier, string> = {
+		low: tSettings("performance.tiers.low", "Eco"),
+		balanced: tSettings("performance.tiers.balanced", "Balanced"),
+		high: tSettings("performance.tiers.high", "High"),
+	};
+	const modeLabels: Record<PerformanceMode, string> = {
+		auto: tSettings("performance.modes.auto", "Auto ({{tier}})", {
+			tier: tierLabels[recommendedTier],
+		}),
+		low: tSettings("performance.modes.low", "Eco (Low-spec)"),
+		balanced: tSettings("performance.modes.balanced", "Balanced"),
+		high: tSettings("performance.modes.high", "High quality"),
+	};
+	const hardwareSummary = hardware
+		? tSettings(
+				"performance.hardwareSummary",
+				"{{cores}} cores · {{memory}} GB RAM · {{encoder}}",
+				{
+					cores: String(hardware.logicalProcessors),
+					memory: String(hardware.totalMemoryGb),
+					encoder: hardware.hasHardwareEncoder
+						? tSettings("performance.hwEncoderReady", "HW encoder ready")
+						: tSettings("performance.cpuEncoderOnly", "CPU encoder fallback"),
+				},
+			)
+		: null;
 	return (
 		<SettingsSections
 			categories={
@@ -165,6 +203,142 @@ export function AppSettings(props: Props) {
 						</ListBox>
 					</HeroSelect.Popover>
 				</HeroSelect>
+
+				<section className="space-y-3" aria-label={tSettings("performance.title", "Performance")}>
+					<header className="dashboard-settings-group dashboard-settings-subgroup">
+						<h2>{tSettings("performance.title", "Performance")}</h2>
+						{hardwareSummary && (
+							<p className="text-xs text-muted">
+								{hardwareSummary} ·{" "}
+								{tSettings("performance.recommendedLabel", "Recommended: {{tier}}", {
+									tier: tierLabels[recommendedTier],
+								})}
+							</p>
+						)}
+					</header>
+					<div className="settings-group space-y-3">
+						<HeroSelect
+							variant="secondary"
+							aria-label={tSettings("performance.mode", "Performance mode")}
+							value={preferences.performanceMode}
+							isDisabled={savingPerformancePreferences}
+							onChange={(key) => {
+								const nextMode = String(key) as PerformanceMode;
+								if (
+									nextMode === "auto" ||
+									nextMode === "low" ||
+									nextMode === "balanced" ||
+									nextMode === "high"
+								) {
+									void updatePerformancePreferencesState({ performanceMode: nextMode });
+								}
+							}}
+						>
+							<SettingsRow
+								title={tSettings("performance.mode", "Performance mode")}
+								description={tSettings(
+									"performance.modeDescription",
+									"Adjust capture, preview, and export resource usage automatically or lock a quality preset.",
+								)}
+							>
+								<HeroSelect.Trigger className="h-9 min-w-[168px] text-sm">
+									<HeroSelect.Value>
+										<span className="truncate">
+											{modeLabels[preferences.performanceMode]}
+										</span>
+									</HeroSelect.Value>
+									<HeroSelect.Indicator />
+								</HeroSelect.Trigger>
+							</SettingsRow>
+							<HeroSelect.Popover className="max-h-72">
+								<ListBox>
+									{(["auto", "low", "balanced", "high"] as const).map((mode) => (
+										<ListBox.Item key={mode} id={mode} textValue={modeLabels[mode]}>
+											<Label>{modeLabels[mode]}</Label>
+											<ListBox.ItemIndicator />
+										</ListBox.Item>
+									))}
+								</ListBox>
+							</HeroSelect.Popover>
+						</HeroSelect>
+
+						<SettingsRow
+							title={tSettings("performance.captureResolution", "Capture resolution")}
+							description={tSettings(
+								"performance.captureResolutionDescription",
+								"Cap screen recording resolution to reduce CPU, memory, and disk usage on lighter PCs.",
+							)}
+						>
+							<ChoiceGroup
+								type="single"
+								aria-label={tSettings(
+									"performance.captureResolution",
+									"Capture resolution",
+								)}
+								value={preferences.captureMaxResolution}
+								onValueChange={(value) => {
+									if (value === "auto" || value === "1080p" || value === "native") {
+										void updatePerformancePreferencesState({
+											captureMaxResolution: value as CaptureMaxResolution,
+										});
+									}
+								}}
+								size="sm"
+							>
+								<ChoiceItem value="auto">
+									{tSettings("performance.resolutions.auto", "Auto")}
+								</ChoiceItem>
+								<ChoiceItem value="1080p">
+									{tSettings("performance.resolutions.1080p", "1080p")}
+								</ChoiceItem>
+								<ChoiceItem value="native">
+									{tSettings("performance.resolutions.native", "Native")}
+								</ChoiceItem>
+							</ChoiceGroup>
+						</SettingsRow>
+
+						<SettingsRow
+							title={tSettings("performance.captureFps", "Capture FPS")}
+							description={tSettings(
+								"performance.captureFpsDescription",
+								"Use 30 FPS for smoother multitasking on 4–8 core machines or 60 FPS for maximum motion clarity.",
+							)}
+						>
+							<ChoiceGroup
+								type="single"
+								aria-label={tSettings("performance.captureFps", "Capture FPS")}
+								value={String(preferences.captureFps)}
+								onValueChange={(value) => {
+									const nextFps: CaptureFpsOption | null =
+										value === "auto"
+											? "auto"
+											: value === "30"
+												? 30
+												: value === "60"
+													? 60
+													: null;
+									if (nextFps !== null) {
+										void updatePerformancePreferencesState({
+											captureFps: nextFps,
+										});
+									}
+								}}
+								size="sm"
+							>
+								<ChoiceItem value="auto">
+									{tSettings("performance.fpsOptions.auto", "Auto")}
+								</ChoiceItem>
+								<ChoiceItem value="30">
+									{tSettings("performance.fpsOptions.30", "30 FPS")}
+								</ChoiceItem>
+								<ChoiceItem value="60">
+									{tSettings("performance.fpsOptions.60", "60 FPS")}
+								</ChoiceItem>
+							</ChoiceGroup>
+						</SettingsRow>
+					</div>
+				</section>
+
 				<ApplicationSettings />
 			</SettingsCategory>
 			<SettingsCategory category="updates">

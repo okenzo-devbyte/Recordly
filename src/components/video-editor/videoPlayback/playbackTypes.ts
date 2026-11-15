@@ -18,6 +18,7 @@ import {
 	type ZoomRegion,
 	type ZoomTransitionEasing,
 } from "../types";
+import { type PlaybackClockStore } from "../state/playbackClockStore";
 import { DEFAULT_FOCUS } from "./constants";
 export type PlaybackAnimationState = {
 	scale: number;
@@ -53,8 +54,9 @@ export interface VideoPlaybackProps {
 	videoPath: string;
 	onDurationChange: (duration: number) => void;
 	onPreviewReadyChange?: (ready: boolean) => void;
-	onTimeUpdate: (time: number) => void;
-	currentTime: number;
+	onTimeUpdate?: (time: number) => void;
+	currentTime?: number;
+	playbackClock?: PlaybackClockStore;
 	onPlayStateChange: (playing: boolean) => void;
 	onError: (error: string) => void;
 	wallpaper?: string;

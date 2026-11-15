@@ -492,7 +492,7 @@ export function EditorShell(props: Props) {
 								previewAspectRatioValue={previewAspectRatioValue}
 								videoPlaybackRef={ui.videoPlaybackRef}
 								timelineRef={ui.timelineRef}
-								currentTime={ui.currentTime}
+								playbackClock={ui.playbackClock}
 								isPlaying={ui.isPlaying}
 								previewVolume={ui.previewVolume}
 								setPreviewVolume={ui.setPreviewVolume}
@@ -541,7 +541,7 @@ export function EditorShell(props: Props) {
 								videoSourcePath={project.videoSourcePath}
 								cursorTelemetrySourcePath={timeline.cursorTelemetrySourcePath}
 								normalizedCursorTelemetry={cursor.normalizedCursorTelemetry}
-								currentTime={ui.currentTime}
+								playbackClock={ui.playbackClock}
 								handleSelectAnnotation={handleSelectAnnotation}
 							/>
 						</AutoZoomNudgeContext.Provider>

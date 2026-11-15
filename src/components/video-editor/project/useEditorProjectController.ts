@@ -33,7 +33,7 @@ type Input = {
 	setVideoPath: Dispatch<SetStateAction<string | null>>;
 	videoSourcePath: string | null;
 	setVideoSourcePath: Dispatch<SetStateAction<string | null>>;
-	currentTime: number;
+	currentTime?: number;
 	setCurrentTime: Dispatch<SetStateAction<number>>;
 	setIsPlaying: Dispatch<SetStateAction<boolean>>;
 	setDuration: Dispatch<SetStateAction<number>>;

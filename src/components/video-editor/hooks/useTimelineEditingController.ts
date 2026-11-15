@@ -5,6 +5,7 @@ import { toast } from "@/components/ui/toast";
 import type { useI18n } from "@/contexts/I18nContext";
 import type { useShortcuts } from "@/contexts/ShortcutsContext";
 import { useVideoEditorAudio } from "../audio/useVideoEditorAudio";
+import type { PlaybackClockStore } from "../state/playbackClockStore";
 import type { useAppearanceState } from "../state/useAppearanceState";
 import type { useTimelineState } from "../state/useTimelineState";
 import type { TimelineEditorHandle } from "../timeline/TimelineEditor";
@@ -31,7 +32,8 @@ type Input = {
 	videoSourcePath: string | null;
 	currentSourcePath: string | null;
 	duration: number;
-	currentTime: number;
+	playbackClock?: PlaybackClockStore;
+	currentTime?: number;
 	isPlaying: boolean;
 	previewVolume: number;
 	setActiveEffectSection: Dispatch<SetStateAction<EditorEffectSection>>;
@@ -51,6 +53,7 @@ type Input = {
 
 export function useTimelineEditingController(input: Input) {
 	const { timeline } = input;
+	const fallbackCurrentTime = input.currentTime ?? 0;
 	const handleSourceFallbackLoadError = useCallback((error: unknown) => {
 		toast.warning(
 			translate(
@@ -71,7 +74,7 @@ export function useTimelineEditingController(input: Input) {
 	const projection = useTimelineProjection({
 		timeline,
 		duration: input.duration,
-		currentTime: input.currentTime,
+		currentTime: fallbackCurrentTime,
 		nextClipIdRef: input.nextClipIdRef,
 		initializedRef: input.clipInitializedRef,
 		autoFullTrackIdRef: input.autoFullTrackClipIdRef,
@@ -86,8 +89,9 @@ export function useTimelineEditingController(input: Input) {
 		setSourceAudioTrackSettingsByClip: timeline.setSourceAudioTrackSettingsByClip,
 		defaultSourceAudioTrackSettings: timeline.defaultSourceAudioTrackSettings,
 		setDefaultSourceAudioTrackSettings: timeline.setDefaultSourceAudioTrackSettings,
+		playbackClock: input.playbackClock,
 		timelineTime: projection.timelinePlayheadTime,
-		currentTime: projection.mapTimelineTimeToSourceTime(input.currentTime * 1000) / 1000,
+		currentTime: projection.mapTimelineTimeToSourceTime(fallbackCurrentTime * 1000) / 1000,
 		duration: input.duration,
 		isPlaying: input.isPlaying,
 		previewVolume: input.previewVolume,
@@ -99,6 +103,7 @@ export function useTimelineEditingController(input: Input) {
 		videoPlaybackRef: input.videoPlaybackRef,
 		timelineRef: input.timelineRef,
 		playSourceAudioPreview: audio.playSourceAudioPreview,
+		playbackClock: input.playbackClock,
 		timelinePlayheadTime: projection.timelinePlayheadTime,
 		timelineDuration: projection.timelineDuration,
 	});

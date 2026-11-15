@@ -136,11 +136,12 @@ describe("caption generation pipeline", () => {
 			captionModelId: "whisper-base",
 			engine: "parakeet",
 			parakeetModelPath: "/stale/parakeet",
+			threads: 3,
 		});
 		expect(mocks.managedModel).toHaveBeenCalledWith("whisper-base");
 		expect(mocks.parakeet).not.toHaveBeenCalled();
 		expect(whisperCalls()[0][1]).toEqual(
-			expect.arrayContaining(["-m", "/verified/base.bin", "-ojf", "-l", "auto"]),
+			expect.arrayContaining(["-m", "/verified/base.bin", "-t", "3", "-ojf", "-l", "auto"]),
 		);
 		expect(result.cues[0].words?.[0]).toMatchObject({ text: "Hello", startMs: 0, endMs: 900 });
 	});

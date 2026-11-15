@@ -24,6 +24,13 @@ vi.mock("./initializePreviewRenderer", () => ({
 }));
 vi.mock("@/lib/exporter/videoBlurFilters", () => ({ createVideoBlurFilters: vi.fn() }));
 vi.mock("@/lib/pixiApplicationLifecycle", () => ({ destroyPixiApplication: vi.fn() }));
+vi.mock("./previewShadows", () => ({
+	createPreviewShadowController: () => ({
+		attach: vi.fn(),
+		updateLayout: vi.fn(),
+		destroy: vi.fn(),
+	}),
+}));
 
 it("does not allocate a GPU context after a hover leaves during shared asset loading", async () => {
 	let finishLoading = () => {};
@@ -38,6 +45,7 @@ it("does not allocate a GPU context after a hover leaves during shared asset loa
 		appRef: ref(),
 		cameraContainerRef: ref(),
 		videoEffectsContainerRef: ref(),
+		previewShadowControllerRef: ref(),
 		zoomBlurFilterRef: ref(),
 		motionBlurFilterRef: ref(),
 		videoContainerRef: ref(),

@@ -17,7 +17,8 @@ export default function TimelineCanvas({
 	videoPath,
 	items,
 	videoDurationMs,
-	currentTimeMs,
+	playbackClock,
+	currentTimeMs = 0,
 	onSeek,
 	onApplyAutoZooms,
 	onAddZoomAtMs,
@@ -291,6 +292,7 @@ export default function TimelineCanvas({
 			<div aria-hidden="true" style={{ height: TIMELINE_AXIS_HEIGHT_PX, flexShrink: 0 }} />
 			<PlaybackCursor
 				clips={clipPresentation}
+				playbackClock={playbackClock}
 				currentTimeMs={currentTimeMs}
 				videoDurationMs={videoDurationMs}
 				onSeek={onSeek}

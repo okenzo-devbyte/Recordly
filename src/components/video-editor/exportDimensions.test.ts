@@ -444,14 +444,16 @@ describe("MP4 dimension validation follows the export route", () => {
 			metrics: {},
 		} as unknown as Parameters<typeof startNativeVideoExport>[0];
 		await expect(startNativeVideoExport(session, {})).resolves.toBe(true);
-		expect(start).toHaveBeenCalledWith({
-			width: 3840,
-			height: 2160,
-			frameRate: 60,
-			bitrate: 32_000_000,
-			encodingMode: "quality",
-			inputMode: "rawvideo",
-		});
+		expect(start).toHaveBeenCalledWith(
+			expect.objectContaining({
+				width: 3840,
+				height: 2160,
+				frameRate: 60,
+				bitrate: 32_000_000,
+				encodingMode: "quality",
+				inputMode: "rawvideo",
+			}),
+		);
 	});
 	it.each([
 		{

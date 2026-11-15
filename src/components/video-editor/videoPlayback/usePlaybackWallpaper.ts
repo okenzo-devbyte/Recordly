@@ -12,6 +12,7 @@ import {
 	DEFAULT_WALLPAPER_RELATIVE_PATH,
 	isVideoWallpaperSource,
 } from "@/lib/wallpapers";
+import { usePerformanceBudget } from "@/lib/performanceProfileStore";
 import { getCaptionFontFamily } from "../captionFonts";
 import type { PlaybackProps } from "./playbackProps";
 import { getEffectiveNativeAspectRatio } from "./playbackTypes";
@@ -22,6 +23,7 @@ export type usePlaybackWallpaperInput = Pick<
 	| "onDurationChange"
 	| "currentTime"
 	| "currentTimeRef"
+	| "playbackClock"
 	| "wallpaper"
 	| "previewViewportWidth"
 	| "backgroundBlur"
@@ -37,6 +39,7 @@ export function usePlaybackWallpaper(input: usePlaybackWallpaperInput) {
 		onDurationChange,
 		currentTime,
 		currentTimeRef,
+		playbackClock,
 		wallpaper,
 		previewViewportWidth,
 		backgroundBlur,
@@ -47,13 +50,15 @@ export function usePlaybackWallpaper(input: usePlaybackWallpaperInput) {
 		cropRegion,
 		videoRef,
 	} = input;
+	const budget = usePerformanceBudget();
 
 	const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
 		const video = e.currentTarget;
 		onDurationChange(video.duration);
 
+		const initialSourceTime = playbackClock ? playbackClock.getSourceTime() : currentTime;
 		const targetTime = clampMediaTimeToDuration(
-			currentTime,
+			initialSourceTime,
 			Number.isFinite(video.duration) ? video.duration : null,
 		);
 		if (Math.abs(video.currentTime - targetTime) > 1e-8) video.currentTime = targetTime;
@@ -161,11 +166,14 @@ export function usePlaybackWallpaper(input: usePlaybackWallpaperInput) {
 			? {}
 			: { background: resolvedWallpaper || "" };
 
-	const sceneEffects = getSceneEffectMetrics({
+	const rawSceneEffects = getSceneEffectMetrics({
 		viewportWidth: previewViewportWidth,
-		backgroundBlur,
+		backgroundBlur: budget.preview.allowDomBlur ? backgroundBlur : 0,
 		shadowIntensity: showShadow ? shadowIntensity : 0,
 	});
+	const sceneEffects = budget.preview.allowCssDropShadow
+		? rawSceneEffects
+		: { ...rawSceneEffects, shadowFilter: "none" };
 
 	const captionFontFamily = getCaptionFontFamily(autoCaptionSettings);
 

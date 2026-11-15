@@ -1,4 +1,8 @@
-import { ensureCaptionFontLoaded } from "@/components/video-editor/captionFonts";
+import {
+	containsThaiCharacters,
+	ensureCaptionFontLoaded,
+	ensureCaptionThaiFallbackLoaded,
+} from "@/components/video-editor/captionFonts";
 import { Application, Container, Graphics, Rectangle, RendererType, Sprite } from "pixi.js";
 import type { MotionBlurFilter } from "pixi-filters/motion-blur";
 import type { ZoomBlurFilter } from "pixi-filters/zoom-blur";
@@ -91,8 +95,15 @@ export class FrameScene {
 	}
 
 	async initialize(): Promise<void> {
-		if (this.context.config.autoCaptionSettings?.enabled)
+		if (this.context.config.autoCaptionSettings?.enabled) {
 			await ensureCaptionFontLoaded(this.context.config.autoCaptionSettings);
+			const needsThaiFont =
+				this.context.config.autoCaptionSettings.language === "th" ||
+				this.context.config.autoCaptions?.some((cue) => containsThaiCharacters(cue.text));
+			if (needsThaiFont) {
+				await ensureCaptionThaiFallbackLoaded();
+			}
+		}
 		let cursorOverlayEnabled = true;
 		try {
 			await preloadCursorAssets();

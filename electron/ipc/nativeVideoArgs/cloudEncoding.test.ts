@@ -64,4 +64,33 @@ describe("cloud delivery encoding", () => {
 		expect(args).not.toContain("-crf");
 		expect(args).not.toContain("-preset");
 	});
+	it("applies preferFastSoftwarePreset and maxThreads on local libx264 exports", () => {
+		const balancedFastArgs = buildNativeVideoExportArgs(
+			"libx264",
+			{
+				...options,
+				encodingMode: "balanced",
+				preferFastSoftwarePreset: true,
+				maxThreads: 3,
+			},
+			"local-fast.mp4",
+		);
+		expect(balancedFastArgs).toEqual(
+			expect.arrayContaining(["-preset", "veryfast", "-threads", "3"]),
+		);
+
+		const qualityDefaultArgs = buildNativeVideoExportArgs(
+			"libx264",
+			{
+				...options,
+				encodingMode: "quality",
+				preferFastSoftwarePreset: false,
+				maxThreads: 6,
+			},
+			"local-quality.mp4",
+		);
+		expect(qualityDefaultArgs).toEqual(
+			expect.arrayContaining(["-preset", "slow", "-threads", "6"]),
+		);
+	});
 });

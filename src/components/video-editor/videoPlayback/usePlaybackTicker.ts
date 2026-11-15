@@ -14,7 +14,7 @@ import {
 import type { usePlaybackState } from "./usePlaybackState";
 import type { usePlaybackWebcamLayout } from "./usePlaybackWebcamLayout";
 import { findDominantRegion } from "./zoomRegionUtils";
-import { applyZoomTransform, computeZoomTransform } from "./zoomTransform";
+import { applyZoomTransform, computeZoomTransform, syncVideoBlurFilters } from "./zoomTransform";
 export type usePlaybackTickerInput = Pick<
 	ReturnType<typeof usePlaybackState> &
 		ReturnType<typeof usePlaybackWebcamLayout> &
@@ -163,6 +163,13 @@ export function usePlaybackTicker(input: usePlaybackTickerInput) {
 				motionBlurState: motionBlurStateRef.current,
 				frameTimeMs: timelineTimeRef.current * 1000,
 				motionSample,
+			});
+
+			syncVideoBlurFilters({
+				videoEffectsContainer: videoEffectsContainerRef.current,
+				zoomBlurFilter: zoomBlurFilterRef.current,
+				motionBlurFilter: motionBlurFilterRef.current,
+				motionBlurAmount: zoomMotionBlurRef.current,
 			});
 
 			state.x = appliedTransform.x;

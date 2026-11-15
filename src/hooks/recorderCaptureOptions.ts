@@ -1,3 +1,5 @@
+import { type PerformanceBudget, resolvePerformanceBudget } from "@/shared/performanceProfile";
+
 export const TARGET_FRAME_RATE = 60;
 export const TARGET_WIDTH = 3840;
 export const TARGET_HEIGHT = 2160;
@@ -13,7 +15,7 @@ export const HIGH_FRAME_RATE_BOOST = 1.7;
 export const DEFAULT_WIDTH = 1920;
 export const DEFAULT_HEIGHT = 1080;
 export const CODEC_ALIGNMENT = 2;
-export const RECORDER_TIMESLICE_MS = 250;
+export const RECORDER_TIMESLICE_MS = 1000;
 export const BITS_PER_MEGABIT = 1_000_000;
 export const MIN_FRAME_RATE = 30;
 export const CHROME_MEDIA_SOURCE = "desktop";
@@ -27,6 +29,20 @@ export type BrowserCaptureCursorPolicy = {
 	hideOsCursorBeforeRecording: boolean;
 	hideEditorOverlayCursorByDefault: boolean;
 };
+
+export function getCaptureBudget(budget?: PerformanceBudget) {
+	const resolved = budget ?? resolvePerformanceBudget();
+	return {
+		maxWidth: resolved.recording.maxWidth,
+		maxHeight: resolved.recording.maxHeight,
+		fps: resolved.recording.fps,
+		minFrameRate: Math.min(MIN_FRAME_RATE, resolved.recording.fps),
+		bitrateMultiplier: resolved.recording.bitrateMultiplier,
+		minTargetBitrateBps: resolved.recording.minTargetBitrateBps,
+		maxTargetBitrateBps: resolved.recording.maxTargetBitrateBps,
+		timesliceMs: resolved.recording.timesliceMs,
+	};
+}
 
 export function resolveBrowserCaptureCursorPolicy({
 	nativeWindowsCaptureStartFailed = false,
@@ -80,18 +96,14 @@ export function createBrowserRecordingOptions({
 
 	return options;
 }
-export const computeBitrate = (width: number, height: number) => {
+export const computeBitrate = (width: number, height: number, budget?: PerformanceBudget) => {
 	const pixels = width * height;
-	const highFrameRateBoost =
-		TARGET_FRAME_RATE >= HIGH_FRAME_RATE_THRESHOLD ? HIGH_FRAME_RATE_BOOST : 1;
-
-	if (pixels >= FOUR_K_PIXELS) {
-		return Math.round(BITRATE_4K * highFrameRateBoost);
-	}
-
-	if (pixels >= QHD_PIXELS) {
-		return Math.round(BITRATE_QHD * highFrameRateBoost);
-	}
-
-	return Math.round(BITRATE_BASE * highFrameRateBoost);
+	const captureBudget = getCaptureBudget(budget);
+	const rawBitrate =
+		pixels >= FOUR_K_PIXELS ? BITRATE_4K : pixels >= QHD_PIXELS ? BITRATE_QHD : BITRATE_BASE;
+	const scaled = Math.round(rawBitrate * captureBudget.bitrateMultiplier);
+	return Math.min(
+		captureBudget.maxTargetBitrateBps,
+		Math.max(captureBudget.minTargetBitrateBps, scaled),
+	);
 };

@@ -1,17 +1,20 @@
 import { useTimelineContext } from "dnd-timeline";
-import { useEffect, useState, type RefObject } from "react";
+import { type RefObject, useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
-import { formatPlayheadTime } from "../../core/time";
-
+import type { PlaybackClockStore } from "../../../state/playbackClockStore";
 import {
+	type ClipPresentation,
 	getPlayheadDisplayTime,
 	getTimeAtClipSeam,
-	type ClipPresentation,
 } from "../../core/clipPresentation";
+import { formatPlayheadTime } from "../../core/time";
+
+const noopSubscribe = () => () => undefined;
 
 interface PlaybackCursorProps {
 	clips: ClipPresentation[];
-	currentTimeMs: number;
+	playbackClock?: PlaybackClockStore;
+	currentTimeMs?: number;
 	videoDurationMs: number;
 	onSeek?: (time: number) => void;
 	timelineRef: RefObject<HTMLDivElement | null>;
@@ -21,7 +24,8 @@ interface PlaybackCursorProps {
 
 export default function PlaybackCursor({
 	clips,
-	currentTimeMs,
+	playbackClock,
+	currentTimeMs = 0,
 	videoDurationMs,
 	onSeek,
 	timelineRef,
@@ -32,6 +36,16 @@ export default function PlaybackCursor({
 	const sideProperty = direction === "rtl" ? "right" : "left";
 	const [isDragging, setIsDragging] = useState(false);
 	const [isHovered, setIsHovered] = useState(false);
+	const subscribeClock = useCallback(
+		(listener: () => void) =>
+			playbackClock ? playbackClock.subscribe(listener) : noopSubscribe(),
+		[playbackClock],
+	);
+	const activeTimeMs = useSyncExternalStore(
+		subscribeClock,
+		() => (playbackClock ? Math.round(playbackClock.getTimelineTime() * 1000) : currentTimeMs),
+		() => currentTimeMs,
+	);
 
 	useEffect(() => {
 		if (!isDragging) return;
@@ -89,8 +103,8 @@ export default function PlaybackCursor({
 		direction,
 	]);
 
-	if (videoDurationMs <= 0 || currentTimeMs < 0) return null;
-	const clampedTime = Math.min(currentTimeMs, videoDurationMs);
+	if (videoDurationMs <= 0 || activeTimeMs < 0) return null;
+	const clampedTime = Math.min(activeTimeMs, videoDurationMs);
 	if (clampedTime < range.start || clampedTime > range.end) return null;
 
 	const offset = valueToPixels(getPlayheadDisplayTime(clampedTime, clips) - range.start);

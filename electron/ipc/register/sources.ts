@@ -8,6 +8,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { app, BrowserWindow, desktopCapturer, ipcMain, systemPreferences } from "electron";
 import {
+	closeIdleHudOverlayWindow,
 	setHudRecordingPreparationActive,
 	createHudOverlayWindow,
 	getHudOverlayWindow,
@@ -681,6 +682,7 @@ body{background:transparent;overflow:hidden;width:100vw;height:100vh}
 		recordingEditorLoading.clearError();
 		setHudRecordingPreparationActive(false);
 		recordingNavigation.open(false);
+		closeIdleHudOverlayWindow();
 	});
 	ipcMain.handle("open-loading-recording-editor", (event) => {
 		const sender = event.sender;

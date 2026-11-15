@@ -23,6 +23,7 @@ const assetDirectories = [
 	"src/assets/cursors/community",
 	"src/assets/cursors/pixel-glove",
 	"src/assets/fonts/dm-sans",
+	"src/assets/fonts/noto-sans-thai",
 	"src/assets/fonts/tiktok-sans",
 	"src/assets/liquid-glass",
 ];
@@ -37,6 +38,7 @@ const requiredLegalFiles = [
 	"src/assets/cursors/pixel-glove/LICENSE.GPL",
 	"src/assets/cursors/pixel-glove/AUTHORS",
 	"src/assets/fonts/dm-sans/OFL.txt",
+	"src/assets/fonts/noto-sans-thai/OFL.txt",
 	"src/assets/fonts/tiktok-sans/OFL.txt",
 	"src/assets/liquid-glass/LICENSE",
 	"build/legal/sherpa-onnx/LICENSE",

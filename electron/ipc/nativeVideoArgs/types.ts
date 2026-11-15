@@ -14,6 +14,9 @@ export interface NativeVideoExportStartOptions {
 	encodingMode: NativeExportEncodingMode;
 	inputMode?: "rawvideo" | "h264-stream";
 	deliveryProfile?: "cloud";
+	maxThreads?: number;
+	preferFastSoftwarePreset?: boolean;
+	lowMemory?: boolean;
 }
 
 export interface NativeVideoExportAudioSegment {

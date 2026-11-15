@@ -291,6 +291,9 @@ export function registerExportHandlers() {
 				encodingMode: NativeExportEncodingMode;
 				inputMode?: "rawvideo" | "h264-stream";
 				deliveryProfile?: "cloud";
+				maxThreads?: number;
+				preferFastSoftwarePreset?: boolean;
+				lowMemory?: boolean;
 			},
 		) => {
 			try {
@@ -304,6 +307,29 @@ export function registerExportHandlers() {
 				const outputPath = path.join(app.getPath("temp"), `${sessionId}.mp4`);
 				observeShareExportSource(event.sender.id, outputPath);
 
+				let resolvedOptions = options;
+				if (
+					options.maxThreads === undefined ||
+					options.preferFastSoftwarePreset === undefined ||
+					options.lowMemory === undefined
+				) {
+					const hw = await import("../system/hardwareProfile").catch(() => null);
+					const budget = hw ? await hw.getMainPerformanceBudget().catch(() => null) : null;
+					if (budget) {
+						resolvedOptions = {
+							...options,
+							maxThreads: options.maxThreads ?? budget.export.libx264MaxThreads,
+							preferFastSoftwarePreset:
+								options.preferFastSoftwarePreset ??
+								budget.export.preferFastSoftwarePreset,
+							lowMemory:
+								options.lowMemory ??
+								(budget.export.allowLowMemoryProfile &&
+									(budget.hardware?.totalMemoryGb ?? Infinity) <= 8),
+						};
+					}
+				}
+
 				let encoderName: string;
 				let ffmpegArgs: string[];
 
@@ -311,12 +337,19 @@ export function registerExportHandlers() {
 					// Pre-encoded H.264 Annex B from browser VideoEncoder — just stream-copy into MP4
 					encoderName = "h264-stream-copy";
 					ffmpegArgs = buildNativeH264StreamExportArgs({
-						frameRate: options.frameRate,
+						frameRate: resolvedOptions.frameRate,
 						outputPath,
 					});
 				} else {
-					encoderName = await resolveNativeVideoEncoder(ffmpegPath, options.encodingMode);
-					ffmpegArgs = buildNativeVideoExportArgs(encoderName, options, outputPath);
+					encoderName = await resolveNativeVideoEncoder(
+						ffmpegPath,
+						resolvedOptions.encodingMode,
+					);
+					ffmpegArgs = buildNativeVideoExportArgs(
+						encoderName,
+						resolvedOptions,
+						outputPath,
+					);
 				}
 
 				const ffmpegProcess = spawn(ffmpegPath, progressiveShareFfmpegArgs(ffmpegArgs), {
@@ -325,7 +358,7 @@ export function registerExportHandlers() {
 				// For rawvideo, frames are a fixed RGBA size. For h264-stream, chunks are variable.
 				const inputByteSize =
 					inputMode === "rawvideo"
-						? getNativeVideoInputByteSize(options.width, options.height)
+						? getNativeVideoInputByteSize(resolvedOptions.width, resolvedOptions.height)
 						: 0;
 
 				const session: NativeVideoExportSession = {
@@ -335,8 +368,12 @@ export function registerExportHandlers() {
 					inputMode,
 					maxQueuedWriteBytes:
 						inputMode === "h264-stream"
-							? 32 * 1024 * 1024
-							: getNativeVideoExportMaxQueuedWriteBytes(inputByteSize),
+							? resolvedOptions.lowMemory
+								? 16 * 1024 * 1024
+								: 32 * 1024 * 1024
+							: getNativeVideoExportMaxQueuedWriteBytes(inputByteSize, {
+									lowMemory: resolvedOptions.lowMemory,
+								}),
 					stderrOutput: "",
 					encoderName,
 					processError: null,

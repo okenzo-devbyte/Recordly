@@ -80,7 +80,22 @@ describe("bundled caption fonts", () => {
 	});
 
 	it("does not require browser font APIs for other caption styles", async () => {
-		const { ensureCaptionFontLoaded } = await import("./captionFonts");
+		const { ensureCaptionFontLoaded, ensureCaptionThaiFallbackLoaded } = await import(
+			"./captionFonts"
+		);
 		await ensureCaptionFontLoaded({ style: "classic", fontFamily: "Helvetica" });
+		await ensureCaptionThaiFallbackLoaded();
+	});
+
+	it("appends Noto Sans Thai fallback only when sample caption text contains Thai glyphs", async () => {
+		const { containsThaiCharacters, withCaptionThaiFallback } = await import("./captionFonts");
+		expect(containsThaiCharacters("สวัสดีครับ")).toBe(true);
+		expect(containsThaiCharacters("Hello world")).toBe(false);
+		expect(withCaptionThaiFallback('"Times New Roman", serif', "Hello world")).toBe(
+			'"Times New Roman", serif',
+		);
+		expect(withCaptionThaiFallback('"Times New Roman", serif', "ข้อความไทย")).toBe(
+			'"Times New Roman", serif, "Noto Sans Thai"',
+		);
 	});
 });

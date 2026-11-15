@@ -172,5 +172,7 @@
 	"mergeClipsUnavailable": "結合するには、速度とオーディオ設定が同じ連続した映像が必要です。",
 	"mergeClips": "クリップを結合",
 	"captionStyleClassic": "クラシック",
-	"captionStyleReveal": "リビール"
+	"captionStyleReveal": "リビール",
+	"captionLanguageth": "タイ語",
+	"parakeetLanguageRequiresWhisper": "選択した言語には Whisper Base または Whisper Small が必要です。Parakeet はヨーロッパ言語のみ対応しています。"
 }

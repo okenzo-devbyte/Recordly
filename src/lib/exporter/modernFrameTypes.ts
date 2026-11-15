@@ -20,6 +20,7 @@ import type { ExportRenderBackend } from "./types";
 
 export interface FrameRenderConfig {
 	timelineEffects?: boolean;
+	preferMediaElementSampling?: boolean;
 	width: number;
 	height: number;
 	preferredRenderBackend?: ExportRenderBackend;

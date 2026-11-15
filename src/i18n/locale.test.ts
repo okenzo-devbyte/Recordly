@@ -31,6 +31,8 @@ describe("locale negotiation", () => {
 		["ko-KR", "ko"],
 		["ja-JP", "ja"],
 		["ja_JP", "ja"],
+		["th-TH", "th"],
+		["th_TH", "th"],
 		["en-AU", "en"],
 		["de-DE-u-co-phonebk", "de"],
 	])("maps %s to %s", (input, expected) => expect(normalizeLocale(input)).toBe(expected));
@@ -45,6 +47,8 @@ describe("locale negotiation", () => {
 		expect(getSystemLocale()).toBe("zh-TW");
 		vi.stubGlobal("navigator", { languages: ["ja-JP", "en-AU"] });
 		expect(getSystemLocale()).toBe("ja");
+		vi.stubGlobal("navigator", { languages: ["th-TH", "en-US"] });
+		expect(getSystemLocale()).toBe("th");
 	});
 	it("uses navigator.language when the preferred language list is empty", () => {
 		vi.stubGlobal("navigator", { languages: [], language: "fr-CA" });

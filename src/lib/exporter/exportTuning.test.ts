@@ -80,4 +80,51 @@ describe("exportTuning", () => {
 		expect(breezeHeavyProfile.maxDecodeQueue).toBe(8);
 		expect(breezeHeavyProfile.maxPendingFrames).toBe(16);
 	});
+
+	it("selects low-memory profiles on <= 8 GB RAM machines unless disabled", () => {
+		const breezeLowMem = getExportBackpressureProfile({
+			encodeBackend: "ffmpeg",
+			width: 1920,
+			height: 1080,
+			frameRate: 60,
+			encodingMode: "balanced",
+			hardwareConcurrency: 8,
+			deviceMemoryGb: 8,
+		});
+		const webCodecsLowMem = getExportBackpressureProfile({
+			encodeBackend: "webcodecs",
+			width: 1920,
+			height: 1080,
+			frameRate: 60,
+			encodingMode: "balanced",
+			hardwareConcurrency: 6,
+			deviceMemoryGb: 4,
+		});
+		const highPerfOverride = getExportBackpressureProfile({
+			encodeBackend: "ffmpeg",
+			width: 1280,
+			height: 720,
+			frameRate: 60,
+			encodingMode: "balanced",
+			hardwareConcurrency: 8,
+			deviceMemoryGb: 8,
+			allowLowMemoryProfile: false,
+		});
+
+		expect(breezeLowMem).toEqual({
+			name: "breeze-low-memory",
+			maxEncodeQueue: 24,
+			maxDecodeQueue: 4,
+			maxPendingFrames: 6,
+			maxInFlightNativeWrites: 2,
+		});
+		expect(webCodecsLowMem).toEqual({
+			name: "webcodecs-low-memory",
+			maxEncodeQueue: 24,
+			maxDecodeQueue: 4,
+			maxPendingFrames: 8,
+			maxInFlightNativeWrites: 1,
+		});
+		expect(highPerfOverride.name).toBe("breeze-balanced-plus");
+	});
 });

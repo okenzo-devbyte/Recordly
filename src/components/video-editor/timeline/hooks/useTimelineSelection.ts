@@ -3,7 +3,8 @@ import type { TimelineRegion } from "../core/timelineTypes";
 
 interface UseTimelineSelectionParams {
 	totalMs: number;
-	currentTimeMs: number;
+	currentTimeMs?: number;
+	getCurrentTimeMs?: () => number;
 	zoomRegions: TimelineRegion[];
 	clipRegions: TimelineRegion[];
 	annotationRegions: (TimelineRegion & { zIndex: number })[];
@@ -27,7 +28,8 @@ interface UseTimelineSelectionParams {
 
 export function useTimelineSelection({
 	totalMs,
-	currentTimeMs,
+	currentTimeMs = 0,
+	getCurrentTimeMs,
 	zoomRegions,
 	annotationRegions,
 	selectedZoomId,
@@ -53,10 +55,11 @@ export function useTimelineSelection({
 
 	const addKeyframe = useCallback(() => {
 		if (totalMs === 0) return;
-		const time = Math.max(0, Math.min(currentTimeMs, totalMs));
+		const resolvedCurrentTimeMs = getCurrentTimeMs ? getCurrentTimeMs() : currentTimeMs;
+		const time = Math.max(0, Math.min(resolvedCurrentTimeMs, totalMs));
 		if (keyframes.some((kf) => Math.abs(kf.time - time) < 1)) return;
 		setKeyframes((prev) => [...prev, { id: globalThis.crypto.randomUUID(), time }]);
-	}, [currentTimeMs, totalMs, keyframes]);
+	}, [currentTimeMs, getCurrentTimeMs, totalMs, keyframes]);
 
 	const deleteSelectedKeyframe = useCallback(() => {
 		if (!selectedKeyframeId) return;
@@ -192,8 +195,9 @@ export function useTimelineSelection({
 
 	const cycleAnnotationsAtCurrentTime = useCallback(
 		(backward = false) => {
+			const resolvedCurrentTimeMs = getCurrentTimeMs ? getCurrentTimeMs() : currentTimeMs;
 			const overlapping = annotationRegions
-				.filter((a) => currentTimeMs >= a.startMs && currentTimeMs <= a.endMs)
+				.filter((a) => resolvedCurrentTimeMs >= a.startMs && resolvedCurrentTimeMs <= a.endMs)
 				.sort((a, b) => a.zIndex - b.zIndex);
 			if (overlapping.length === 0) {
 				return false;
@@ -211,7 +215,13 @@ export function useTimelineSelection({
 			onSelectAnnotation?.(overlapping[nextIndex].id);
 			return true;
 		},
-		[annotationRegions, currentTimeMs, selectedAnnotationId, onSelectAnnotation],
+		[
+			annotationRegions,
+			currentTimeMs,
+			getCurrentTimeMs,
+			selectedAnnotationId,
+			onSelectAnnotation,
+		],
 	);
 
 	return {

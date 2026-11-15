@@ -1,5 +1,8 @@
 import { drawSquircleOnCanvas, SQUIRCLE_RADIUS_SCALE } from "@/lib/geometry/squircle";
-import { getCaptionFontFamily } from "@/components/video-editor/captionFonts";
+import {
+	getCaptionFontFamily,
+	withCaptionThaiFallback,
+} from "@/components/video-editor/captionFonts";
 import {
 	drawCaptionBoxBorder,
 	getCaptionBackground,
@@ -32,7 +35,9 @@ export function renderCaptions(
 	ctx.save();
 
 	const fontSize = getCaptionScaledFontSize(settings.fontSize, width, settings.maxWidth);
-	ctx.font = `${getCaptionPreset(settings.style).fontWeight} ${fontSize}px ${getCaptionFontFamily(settings)}`;
+	const sampleText = cues.map((cue) => cue.text).join(" ");
+	const fontFamily = withCaptionThaiFallback(getCaptionFontFamily(settings), sampleText);
+	ctx.font = `${getCaptionPreset(settings.style).fontWeight} ${fontSize}px ${fontFamily}`;
 	const padding = getCaptionPadding(fontSize, settings.style);
 
 	const activeCaptionLayout = buildActiveCaptionLayout({
@@ -94,7 +99,7 @@ export function renderCaptions(
 			line,
 			settings,
 			fontSize,
-			getCaptionFontFamily(settings),
+			fontFamily,
 			0,
 			-boxHeight / 2 + paddingY + lineHeight * index,
 			activeCaptionLayout.hasWordTimings,

@@ -16,14 +16,33 @@ export class ModernNativeResources {
 	forceRawvideoNativeRetry = false;
 	nativeOutputChunkCount = 0;
 	nativeReadbackCanvas: HTMLCanvasElement | null = null;
+	nativeReadbackBufferPool: Uint8Array[] = [];
 	nativeEncoderError: Error | null = null;
 	constructor(config: VideoExporterConfig) {
 		this.nativeBackgroundAssets = new NativeStaticLayoutBackgroundAssets(config);
+	}
+	acquireReadbackBuffer(byteLength: number): Uint8Array {
+		while (this.nativeReadbackBufferPool.length > 0) {
+			const candidate = this.nativeReadbackBufferPool.pop()!;
+			if (candidate.byteLength === byteLength) {
+				return candidate;
+			}
+		}
+		return new Uint8Array(byteLength);
+	}
+	releaseReadbackBuffer(buffer: Uint8Array): void {
+		if (this.nativeInputMode !== "rawvideo") {
+			return;
+		}
+		if (this.nativeReadbackBufferPool.length < 12) {
+			this.nativeReadbackBufferPool.push(buffer);
+		}
 	}
 	disposeEncoder(): void {
 		this.nativeInputMode = null;
 		this.nativeOutputChunkCount = 0;
 		this.nativeReadbackCanvas = null;
+		this.nativeReadbackBufferPool = [];
 		if (!this.nativeH264Encoder) {
 			return;
 		}

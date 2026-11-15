@@ -60,7 +60,7 @@ function setup() {
 		downloadedWhisperModelPath: "/models/parakeet-v3",
 		whisperModelDownloadStatus: "downloaded",
 		isGeneratingCaptions: false,
-		autoCaptionSettings: { language: "en" },
+		autoCaptionSettings: { language: "auto" },
 		setIsGeneratingCaptions: vi.fn(),
 		setWhisperModelPath: vi.fn(),
 		setDownloadedWhisperModelPath: vi.fn(),
@@ -284,4 +284,35 @@ it("blocks generation and switching while a model deletion is pending", async ()
 	finishDelete({ success: true });
 	await pending;
 	expect(test.params.setDownloadedWhisperModelPath).toHaveBeenLastCalledWith(null);
+});
+
+it("forwards selected Thai language to Whisper caption generation", async () => {
+	const test = setup();
+	test.render().handleCaptionModelChange("whisper-base");
+	test.params.downloadedWhisperModelPath = "/installed/ggml-base.bin";
+	test.params.autoCaptionSettings = {
+		language: "th",
+	} as typeof test.params.autoCaptionSettings;
+	const pending = test.render().handleGenerateAutoCaptions();
+	expect(test.generateAutoCaptions).toHaveBeenCalledWith(
+		expect.objectContaining({
+			captionModelId: "whisper-base",
+			engine: "whisper",
+			whisperModelPath: "/installed/ggml-base.bin",
+			language: "th",
+		}),
+	);
+	test.complete({ success: true, cues });
+	await pending;
+});
+
+it("blocks caption generation when Parakeet is paired with Thai", async () => {
+	const test = setup();
+	test.params.autoCaptionSettings = {
+		language: "th",
+	} as typeof test.params.autoCaptionSettings;
+	await test.render().handleGenerateAutoCaptions();
+	expect(test.generateAutoCaptions).not.toHaveBeenCalled();
+	expect(toast.error).toHaveBeenCalled();
+	expect(test.params.setIsGeneratingCaptions).not.toHaveBeenCalledWith(true);
 });

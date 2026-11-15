@@ -68,25 +68,27 @@ export class FrameBackground {
 					videoSrc = await getAssetPath(wallpaper.replace(/^\//, ""));
 				}
 
-				try {
-					const frameSource = new ForwardFrameSource();
-					const metadata = await frameSource.initialize(videoSrc);
-					this.context.backgroundPlayback.backgroundForwardFrameSource = frameSource;
-					this.context.backgroundPlayback.backgroundForwardFrameSourceUrl = videoSrc;
-					this.context.backgroundPlayback.backgroundForwardFrameDurationSec =
-						getEffectiveVideoStreamDurationSeconds({
-							duration: metadata?.duration,
-							streamDuration: metadata?.streamDuration,
-						});
-					this.context.backgroundPlayback.backgroundVideoElement = null;
-					this.context.backgroundPlayback.backgroundSeekPromise = null;
-					this.context.backgroundPlayback.lastSyncedBackgroundLoopTimeSec = null;
-					return;
-				} catch (error) {
-					console.warn(
-						"[FrameRenderer] Decoder-backed video wallpaper unavailable during export; falling back to media element sync:",
-						error,
-					);
+				if (!this.context.config.preferMediaElementSampling) {
+					try {
+						const frameSource = new ForwardFrameSource();
+						const metadata = await frameSource.initialize(videoSrc);
+						this.context.backgroundPlayback.backgroundForwardFrameSource = frameSource;
+						this.context.backgroundPlayback.backgroundForwardFrameSourceUrl = videoSrc;
+						this.context.backgroundPlayback.backgroundForwardFrameDurationSec =
+							getEffectiveVideoStreamDurationSeconds({
+								duration: metadata?.duration,
+								streamDuration: metadata?.streamDuration,
+							});
+						this.context.backgroundPlayback.backgroundVideoElement = null;
+						this.context.backgroundPlayback.backgroundSeekPromise = null;
+						this.context.backgroundPlayback.lastSyncedBackgroundLoopTimeSec = null;
+						return;
+					} catch (error) {
+						console.warn(
+							"[FrameRenderer] Decoder-backed video wallpaper unavailable during export; falling back to media element sync:",
+							error,
+						);
+					}
 				}
 
 				if (

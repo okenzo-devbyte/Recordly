@@ -215,6 +215,49 @@ export class FrameRenderer implements FrameRenderContext {
 		);
 	}
 
+	captureBottomUpPixelsInto(target: Uint8Array): boolean {
+		if (!this.scene.app || this.annotations.outputCanvasOverride) {
+			return false;
+		}
+
+		if (this.scene.rendererBackend !== "webgl") {
+			return false;
+		}
+
+		const rendererAny = this.scene.app.renderer as unknown as {
+			gl?: WebGLRenderingContext | WebGL2RenderingContext;
+		};
+		const canvas = this.scene.app.canvas as HTMLCanvasElement | undefined;
+		const gl =
+			rendererAny.gl ??
+			(canvas && typeof canvas.getContext === "function"
+				? ((canvas.getContext("webgl2") ||
+						canvas.getContext("webgl")) as
+						| WebGLRenderingContext
+						| WebGL2RenderingContext
+						| null)
+				: null);
+		if (!gl || typeof gl.readPixels !== "function") {
+			return false;
+		}
+
+		const width = this.config.width;
+		const height = this.config.height;
+		if (target.byteLength < width * height * 4) {
+			return false;
+		}
+
+		try {
+			if (typeof gl.bindFramebuffer === "function") {
+				gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+			}
+			gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, target);
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
 	capturePixelsForNativeExport(): Uint8ClampedArray | null {
 		if (!this.scene.app) {
 			return null;

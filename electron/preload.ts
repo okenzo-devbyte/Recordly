@@ -267,6 +267,26 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	generateWallpaperThumbnail: (filePath: string) => {
 		return ipcRenderer.invoke("generate-wallpaper-thumbnail", filePath);
 	},
+	extractAudioWaveformPeaks: (options: { mediaPathOrUrl: string; peakCount?: number }) => {
+		return ipcRenderer.invoke("extract-audio-waveform-peaks", options) as Promise<{
+			success: boolean;
+			peaks?: Float32Array;
+			durationMs?: number;
+			error?: string;
+		}>;
+	},
+	extractFilmstripFrames: (options: {
+		videoPathOrUrl: string;
+		timesMs: number[];
+		width?: number;
+		height?: number;
+	}) => {
+		return ipcRenderer.invoke("extract-filmstrip-frames", options) as Promise<{
+			success: boolean;
+			frames?: Array<{ timeMs: number; jpegData: Uint8Array }>;
+			error?: string;
+		}>;
+	},
 	probeNativeVideoMetadata: (filePath: string) => {
 		return ipcRenderer.invoke("probe-native-video-metadata", filePath) as Promise<{
 			success: boolean;
@@ -391,6 +411,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
 		encodingMode: "fast" | "balanced" | "quality";
 		inputMode?: "rawvideo" | "h264-stream";
 		deliveryProfile?: "cloud";
+		maxThreads?: number;
+		preferFastSoftwarePreset?: boolean;
+		lowMemory?: boolean;
 	}) => {
 		return ipcRenderer.invoke("native-video-export-start", options);
 	},
@@ -1323,6 +1346,31 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	}) => ipcRenderer.invoke("set-recording-preferences", prefs),
 	getCountdownDelay: () => ipcRenderer.invoke("get-countdown-delay"),
 	setCountdownDelay: (delay: number) => ipcRenderer.invoke("set-countdown-delay", delay),
+	getSystemHardwareProfile: () => ipcRenderer.invoke("get-system-hardware-profile"),
+	getPerformancePreferences: () => ipcRenderer.invoke("get-performance-preferences"),
+	setPerformancePreferences: (prefs: {
+		performanceMode?: "auto" | "low" | "balanced" | "high";
+		captureMaxResolution?: "auto" | "1080p" | "native";
+		captureFps?: "auto" | 30 | 60;
+	}) => ipcRenderer.invoke("set-performance-preferences", prefs),
+	onPerformancePreferencesChanged: (
+		callback: (prefs: {
+			performanceMode: "auto" | "low" | "balanced" | "high";
+			captureMaxResolution: "auto" | "1080p" | "native";
+			captureFps: "auto" | 30 | 60;
+		}) => void,
+	) => {
+		const listener = (
+			_event: Electron.IpcRendererEvent,
+			prefs: {
+				performanceMode: "auto" | "low" | "balanced" | "high";
+				captureMaxResolution: "auto" | "1080p" | "native";
+				captureFps: "auto" | 30 | 60;
+			},
+		) => callback(prefs);
+		ipcRenderer.on("performance-preferences-changed", listener);
+		return () => ipcRenderer.removeListener("performance-preferences-changed", listener);
+	},
 	finishRecordingStartup: () => ipcRenderer.invoke("finish-recording-startup"),
 	startCountdown: (seconds: number) => ipcRenderer.invoke("start-countdown", seconds),
 	cancelCountdown: () => ipcRenderer.invoke("cancel-countdown"),

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getGpuSwitches, shouldForceLinuxEgl } from "./gpuSwitches";
+import { getGpuSwitches, shouldEnableLinuxVaapi, shouldForceLinuxEgl } from "./gpuSwitches";
 
 describe("shouldForceLinuxEgl", () => {
 	it("does not force EGL in a Wayland session", () => {
@@ -78,6 +78,15 @@ describe("getGpuSwitches", () => {
 		expect(getGpuSwitches("linux", { XDG_SESSION_TYPE: "x11" })).toEqual({
 			useGl: undefined,
 			disableFeatures: ["VaapiVideoDecoder", "VaapiVideoEncoder"],
+		});
+	});
+
+	it("enables Linux VAAPI hardware video codecs when explicitly requested", () => {
+		expect(shouldEnableLinuxVaapi({ RECORDLY_ENABLE_LINUX_VAAPI: "1" })).toBe(true);
+		expect(shouldEnableLinuxVaapi({ RECORDLY_ENABLE_LINUX_VAAPI: "true" })).toBe(true);
+		expect(shouldEnableLinuxVaapi({})).toBe(false);
+		expect(getGpuSwitches("linux", { RECORDLY_ENABLE_LINUX_VAAPI: "1" })).toEqual({
+			useGl: undefined,
 		});
 	});
 });

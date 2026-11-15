@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCaptionPreset } from "@/components/video-editor/captionPresets";
+import { containsThaiCharacters } from "../captionFonts";
 import { normalizeCaptionEditText } from "../captionEditing";
 import { prepareCaptionLayout } from "../captionLayout";
 import {
@@ -17,7 +18,8 @@ export type usePlaybackCaptionsInput = Pick<
 	| "overlayRef"
 	| "pixiReady"
 	| "videoReady"
-	| "currentTime"
+	| "playbackClock"
+	| "currentTimeRef"
 	| "captionEditSession"
 	| "onEditAutoCaption"
 	| "clipPlaybackRef"
@@ -33,7 +35,8 @@ export function usePlaybackCaptions(input: usePlaybackCaptionsInput) {
 		overlayRef,
 		pixiReady,
 		videoReady,
-		currentTime,
+		playbackClock,
+		currentTimeRef,
 		captionEditSession,
 		onEditAutoCaption,
 		clipPlaybackRef,
@@ -41,7 +44,11 @@ export function usePlaybackCaptions(input: usePlaybackCaptionsInput) {
 		setCaptionEditSession,
 		captionEditInputRef,
 	} = input;
-	const captionFont = useCaptionFont(autoCaptionSettings);
+	const hasThaiCaptions = useMemo(
+		() => autoCaptions.some((cue) => containsThaiCharacters(cue.text)),
+		[autoCaptions],
+	);
+	const captionFont = useCaptionFont(autoCaptionSettings, hasThaiCaptions);
 
 	const measurementContextRef = useRef<CanvasRenderingContext2D | null>(null);
 	const getMeasurementContext = useCallback(() => {
@@ -107,11 +114,6 @@ export function usePlaybackCaptions(input: usePlaybackCaptionsInput) {
 		captionFont.ready,
 	]);
 
-	const activeCaptionLayout = useMemo(
-		() => preparedCaptionLayout?.(Math.round(currentTime * 1000)) ?? null,
-		[preparedCaptionLayout, currentTime],
-	);
-
 	const isCaptionEditing = captionEditSession !== null;
 
 	const captionEditDraft = captionEditSession?.draft ?? "";
@@ -170,19 +172,29 @@ export function usePlaybackCaptions(input: usePlaybackCaptionsInput) {
 		: "";
 
 	const beginCaptionEdit = useCallback(() => {
-		if (!activeCaptionLayout?.editTarget || !onEditAutoCaption) {
+		if (!onEditAutoCaption || !preparedCaptionLayout) {
+			return;
+		}
+
+		const activeTimeSeconds = playbackClock
+			? playbackClock.getSourceTime()
+			: currentTimeRef.current / 1000;
+		const activeLayout = preparedCaptionLayout(Math.round(activeTimeSeconds * 1000));
+		if (!activeLayout?.editTarget) {
 			return;
 		}
 
 		clipPlaybackRef.current?.pause();
 		const nextSession = {
-			target: activeCaptionLayout.editTarget,
-			draft: activeCaptionLayout.editTarget.text,
+			target: activeLayout.editTarget,
+			draft: activeLayout.editTarget.text,
 		};
 		captionEditSessionRef.current = nextSession;
 		setCaptionEditSession(nextSession);
 	}, [
-		activeCaptionLayout,
+		preparedCaptionLayout,
+		playbackClock,
+		currentTimeRef,
 		onEditAutoCaption,
 		clipPlaybackRef,
 		captionEditSessionRef,
@@ -254,7 +266,7 @@ export function usePlaybackCaptions(input: usePlaybackCaptionsInput) {
 
 	return {
 		captionFontReady: captionFont.ready,
-		activeCaptionLayout,
+		preparedCaptionLayout,
 		isCaptionEditing,
 		captionEditDraft,
 		captionEditTargetId,

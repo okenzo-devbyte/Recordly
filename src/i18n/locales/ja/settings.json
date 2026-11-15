@@ -598,5 +598,40 @@
 	},
 	"annotation": {
 		"delete": "注釈を削除"
+	},
+	"performance": {
+		"title": "パフォーマンス",
+		"hardwareSummary": "{{cores}}コア · {{memory}} GB RAM · {{encoder}}",
+		"hwEncoderReady": "HWエンコーダ対応",
+		"cpuEncoderOnly": "CPUエンコーダを使用",
+		"recommendedLabel": "推奨: {{tier}}",
+		"mode": "パフォーマンスモード",
+		"modeDescription": "録画・プレビュー・書き出しのリソース使用量を自動調整するか、品質プリセットを固定します。",
+		"modes": {
+			"auto": "自動 ({{tier}})",
+			"low": "省負荷（軽量PC）",
+			"balanced": "バランス",
+			"high": "高品質"
+		},
+		"tiers": {
+			"low": "省負荷",
+			"balanced": "バランス",
+			"high": "高"
+		},
+		"captureResolution": "録画解像度",
+		"captureResolutionDescription": "軽量PCでのCPU・メモリ・ディスク負荷を抑えるため録画解像度の上限を設定します。",
+		"resolutions": {
+			"auto": "自動",
+			"1080p": "1080p",
+			"native": "ネイティブ"
+		},
+		"captureFps": "録画FPS",
+		"captureFpsDescription": "4〜8コア環境での安定した動作には30 FPS、滑らかな動きを優先する場合は60 FPSを選びます。",
+		"fpsOptions": {
+			"auto": "自動",
+			"30": "30 FPS",
+			"60": "60 FPS"
+		},
+		"saveFailed": "パフォーマンス設定を保存できませんでした。"
 	}
 }

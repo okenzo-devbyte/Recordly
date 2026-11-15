@@ -598,5 +598,40 @@
 	},
 	"annotation": {
 		"delete": "주석 삭제"
+	},
+	"performance": {
+		"title": "성능",
+		"hardwareSummary": "{{cores}}코어 · {{memory}} GB RAM · {{encoder}}",
+		"hwEncoderReady": "HW 인코더 사용 가능",
+		"cpuEncoderOnly": "CPU 인코더 사용",
+		"recommendedLabel": "권장: {{tier}}",
+		"mode": "성능 모드",
+		"modeDescription": "녹화, 미리보기, 내보내기의 리소스 사용량을 사양에 맞게 자동 조절하거나 품질을 고정합니다.",
+		"modes": {
+			"auto": "자동 ({{tier}})",
+			"low": "절약 (저사양)",
+			"balanced": "균형",
+			"high": "고화질"
+		},
+		"tiers": {
+			"low": "절약",
+			"balanced": "균형",
+			"high": "높음"
+		},
+		"captureResolution": "녹화 해상도",
+		"captureResolutionDescription": "저사양 PC에서 CPU, 메모리 및 디스크 사용량을 줄이기 위해 녹화 해상도를 제한합니다.",
+		"resolutions": {
+			"auto": "자동",
+			"1080p": "1080p",
+			"native": "원본"
+		},
+		"captureFps": "녹화 FPS",
+		"captureFpsDescription": "4~8코어 환경의 원활한 작업을 위해 30 FPS를, 최대 부드러움을 위해 60 FPS를 사용합니다.",
+		"fpsOptions": {
+			"auto": "자동",
+			"30": "30 FPS",
+			"60": "60 FPS"
+		},
+		"saveFailed": "성능 설정을 저장할 수 없습니다."
 	}
 }

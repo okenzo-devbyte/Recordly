@@ -1,4 +1,5 @@
 import { Application } from "pixi.js";
+import { getPerformanceBudgetSnapshot } from "@/lib/performanceProfileStore";
 import {
 	destroyPixiApplication,
 	initializePixiApplicationWithTimeout,
@@ -20,6 +21,9 @@ export function summarizeRendererAttempts(attempts: readonly PixiRendererAttempt
 export const initializePixiRenderer = async (container: HTMLDivElement): Promise<Application> => {
 	const backendOrder: PixiPreviewBackend[] = ["webgl", "webgpu"];
 	const attempts: PixiRendererAttempt[] = [];
+	const budget = getPerformanceBudgetSnapshot();
+	const deviceDpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+	const targetResolution = Math.min(deviceDpr, budget.preview.maxDpr);
 
 	for (const backend of backendOrder) {
 		if (backend === "webgpu" && !(typeof navigator !== "undefined" && "gpu" in navigator)) {
@@ -39,9 +43,9 @@ export const initializePixiRenderer = async (container: HTMLDivElement): Promise
 					width: container.clientWidth,
 					height: container.clientHeight,
 					backgroundAlpha: 0,
-					antialias: true,
+					antialias: budget.preview.antialias,
 					failIfMajorPerformanceCaveat: false,
-					resolution: window.devicePixelRatio || 1,
+					resolution: targetResolution,
 					autoDensity: true,
 					preference: backend,
 					autoStart: false,

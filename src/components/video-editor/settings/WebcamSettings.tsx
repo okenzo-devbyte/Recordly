@@ -7,7 +7,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Switch } from "@/components/ui/switch";
 import { useScopedT } from "@/contexts/I18nContext";
 import { SliderControl } from "../SliderControl";
+import type { PlaybackClockStore } from "../state/playbackClockStore";
 import {
+	type ClipRegion,
 	DEFAULT_WEBCAM_MARGIN,
 	DEFAULT_WEBCAM_POSITION_PRESET,
 	DEFAULT_WEBCAM_POSITION_X,
@@ -34,6 +36,8 @@ interface WebcamSettingsProps {
 	webcamPreviewSrc: string | null;
 	webcamPreviewCurrentTime: number;
 	webcamPreviewPlaying: boolean;
+	playbackClock?: PlaybackClockStore;
+	clipRegions?: ClipRegion[];
 	onWebcamChange?: (webcam: WebcamOverlaySettings) => void;
 	onUploadWebcam?: () => void;
 }
@@ -153,6 +157,8 @@ export function WebcamSettings({
 	webcamPreviewSrc,
 	webcamPreviewCurrentTime,
 	webcamPreviewPlaying,
+	playbackClock,
+	clipRegions,
 	onWebcamChange,
 	onUploadWebcam,
 }: WebcamSettingsProps) {
@@ -443,6 +449,8 @@ export function WebcamSettings({
 					previewSrc={webcamPreviewSrc}
 					previewCurrentTime={webcamPreviewCurrentTime}
 					previewPlaying={webcamPreviewPlaying}
+					playbackClock={playbackClock}
+					clipRegions={clipRegions}
 					previewTimeOffsetMs={webcam?.timeOffsetMs}
 					onCropChange={(cropRegion, previewFrame) =>
 						updateWebcam({

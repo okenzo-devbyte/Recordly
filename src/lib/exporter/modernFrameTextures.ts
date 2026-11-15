@@ -111,6 +111,10 @@ export class FrameTextures {
 		fallbackWidth: number,
 		fallbackHeight: number,
 	): Promise<CanvasImageSource | VideoFrame> {
+		if (this.context.scene.rendererBackend === "webgl") {
+			return frame;
+		}
+
 		if (
 			this.context.scene.rendererBackend !== "webgpu" ||
 			typeof createImageBitmap !== "function"
@@ -261,6 +265,10 @@ export class FrameTextures {
 		// but it has produced unstable webcam overlays in Lightning exports.
 		if (kind === "webcam") {
 			return this.stageVideoFrameOnCanvas(frame, kind, fallbackWidth, fallbackHeight);
+		}
+
+		if (this.context.scene.rendererBackend === "webgl") {
+			return frame;
 		}
 
 		if (this.context.scene.rendererBackend === "webgpu") {

@@ -3,13 +3,15 @@ import type {
 	SourceAudioTrackSettings,
 	SourceAudioTrackWithPeaks,
 } from "@/components/video-editor/audio/audioTypes";
+import type { PlaybackClockStore } from "../../../state/playbackClockStore";
 import type { TimelineRenderItem } from "../../core/timelineTypes";
 
 export interface TimelineCanvasProps {
 	videoPath?: string | null;
 	items: TimelineRenderItem[];
 	videoDurationMs: number;
-	currentTimeMs: number;
+	playbackClock?: PlaybackClockStore;
+	currentTimeMs?: number;
 	onSeek?: (time: number) => void;
 	canPlaceZoomAtMs?: (startMs: number) => boolean;
 	onApplyAutoZooms?: () => void;

@@ -1,6 +1,7 @@
-import React, { useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { SourceAudioTrackSettings } from "@/components/video-editor/audio/audioTypes";
 import { resolveSourceTrackRoutingPolicy } from "@/lib/exporter/sourceTrackRoutingPolicy";
+import type { PlaybackClockStore } from "../state/playbackClockStore";
 import type { AudioRegion, ClipRegion } from "../types";
 import { findClipAtTimelineTime } from "../types";
 import { isClipMutedById } from "./clipAudio";
@@ -36,8 +37,9 @@ interface UseVideoEditorAudioParams {
 	setDefaultSourceAudioTrackSettings: React.Dispatch<
 		React.SetStateAction<SourceAudioTrackSettings>
 	>;
-	currentTime: number;
-	timelineTime: number;
+	playbackClock?: PlaybackClockStore;
+	currentTime?: number;
+	timelineTime?: number;
 	duration: number;
 	isPlaying: boolean;
 	previewVolume: number;
@@ -55,8 +57,9 @@ export function useVideoEditorAudio({
 	setSourceAudioTrackSettingsByClip,
 	defaultSourceAudioTrackSettings,
 	setDefaultSourceAudioTrackSettings,
-	currentTime,
-	timelineTime,
+	playbackClock,
+	currentTime = 0,
+	timelineTime = 0,
 	duration,
 	isPlaying,
 	previewVolume,
@@ -83,15 +86,59 @@ export function useVideoEditorAudio({
 	const previewSourceAudioFallbackPaths = sourceTrackRoutingPolicy.playbackPaths;
 	const shouldMutePreviewVideo = sourceTrackRoutingPolicy.muteEmbeddedPreview;
 
+	const [clockActiveClipId, setClockActiveClipId] = useState<string | null>(
+		() =>
+			findClipAtTimelineTime(
+				(playbackClock ? playbackClock.getTimelineTime() : timelineTime) * 1000,
+				clipRegions,
+			)?.id ?? null,
+	);
+	useEffect(() => {
+		const computeClipId = () =>
+			findClipAtTimelineTime(
+				(playbackClock ? playbackClock.getTimelineTime() : timelineTime) * 1000,
+				clipRegions,
+			)?.id ?? null;
+		setClockActiveClipId((previous) => {
+			const next = computeClipId();
+			return previous === next ? previous : next;
+		});
+		if (!playbackClock) return;
+		return playbackClock.subscribe(() => {
+			const next = computeClipId();
+			setClockActiveClipId((previous) => (previous === next ? previous : next));
+		});
+	}, [clipRegions, playbackClock, timelineTime]);
+
 	const activeClipIdAtCurrentTime = useMemo(
-		() => findClipAtTimelineTime(timelineTime * 1000, clipRegions)?.id ?? null,
-		[clipRegions, timelineTime],
+		() =>
+			playbackClock
+				? clockActiveClipId
+				: (findClipAtTimelineTime(timelineTime * 1000, clipRegions)?.id ?? null),
+		[clipRegions, clockActiveClipId, playbackClock, timelineTime],
 	);
 	const isCurrentClipMuted = useMemo(
 		() =>
 			activeClipIdAtCurrentTime === null ||
 			isClipMutedById(activeClipIdAtCurrentTime, clipRegions),
 		[activeClipIdAtCurrentTime, clipRegions],
+	);
+	const activeClipPlaybackRate = useMemo(() => {
+		if (!activeClipIdAtCurrentTime) return 1;
+		return clipRegions.find((clip) => clip.id === activeClipIdAtCurrentTime)?.speed ?? 1;
+	}, [activeClipIdAtCurrentTime, clipRegions]);
+
+	const getSourcePlaybackRate = useCallback(
+		(timelineSeconds: number) =>
+			findClipAtTimelineTime(timelineSeconds * 1000, clipRegions)?.speed ?? 1,
+		[clipRegions],
+	);
+	const getIsTimelineTimeMuted = useCallback(
+		(timelineSeconds: number) => {
+			const clip = findClipAtTimelineTime(timelineSeconds * 1000, clipRegions);
+			return !clip || isClipMutedById(clip.id, clipRegions);
+		},
+		[clipRegions],
 	);
 
 	const {
@@ -117,10 +164,15 @@ export function useVideoEditorAudio({
 		audioRegions,
 		previewVolume,
 		isPlaying,
+		playbackClock,
 		currentTime,
 		timelineTime,
 		duration,
-		sourcePlaybackRate: findClipAtTimelineTime(timelineTime * 1000, clipRegions)?.speed ?? 1,
+		sourcePlaybackRate: playbackClock
+			? activeClipPlaybackRate
+			: (findClipAtTimelineTime(timelineTime * 1000, clipRegions)?.speed ?? 1),
+		getSourcePlaybackRate: playbackClock ? getSourcePlaybackRate : undefined,
+		getIsTimelineTimeMuted: playbackClock ? getIsTimelineTimeMuted : undefined,
 		previewSourceAudioFallbackPaths,
 		sourceAudioFallbackStartDelayMsByPath,
 		sourceAudioResourceVersion: sourceAudioFallbackRefreshKey,

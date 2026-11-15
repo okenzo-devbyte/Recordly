@@ -1,10 +1,12 @@
 import { execFile, spawnSync } from "node:child_process";
 import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { app } from "electron";
 import type { CaptionModelId } from "../../../src/shared/captionModels";
+import { computeRecommendedThreadCount } from "../../../src/shared/performanceProfile";
 import { getFfmpegBinaryPath } from "../ffmpeg/binary";
 import { getBundledWhisperExecutableCandidates } from "../paths/binaries";
 import { resolveRecordingSession } from "../project/session";
@@ -41,6 +43,7 @@ export interface AutoCaptionGenerationOptions {
 	whisperExecutablePath?: string;
 	whisperModelPath?: string;
 	language?: string;
+	threads?: number;
 }
 
 async function executeWhisper(whisperExecutablePath: string, args: string[]) {
@@ -307,11 +310,32 @@ async function generateCaptionsForSource(
 		} else {
 			const language =
 				options.language && options.language.trim() ? options.language.trim() : "auto";
+			let defaultWhisperThreads = computeRecommendedThreadCount(
+				os.cpus().length || 4,
+				0.6,
+				2,
+				2,
+			);
+			if (options.threads === undefined) {
+				const hw = await import("../system/hardwareProfile").catch(() => null);
+				const budget = hw ? await hw.getMainPerformanceBudget().catch(() => null) : null;
+				if (budget) {
+					defaultWhisperThreads = budget.export.whisperMaxThreads;
+				}
+			}
+			const whisperThreads =
+				typeof options.threads === "number" &&
+				Number.isFinite(options.threads) &&
+				options.threads > 0
+					? Math.max(1, Math.floor(options.threads))
+					: defaultWhisperThreads;
 			const whisperBaseArgs = [
 				"-m",
 				whisperModelPath!,
 				"-f",
 				wavPath,
+				"-t",
+				String(whisperThreads),
 				"-osrt",
 				"-of",
 				outputBase,

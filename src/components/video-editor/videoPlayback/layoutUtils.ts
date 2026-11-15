@@ -186,6 +186,7 @@ interface LayoutResult {
 		y: number;
 		width: number;
 		height: number;
+		radius: number;
 		sourceCrop?: CropRegion;
 	};
 	cropBounds: { startX: number; endX: number; startY: number; endY: number };
@@ -237,18 +238,20 @@ export function layoutVideoContent(params: LayoutParams): LayoutResult | null {
 	videoSprite.scale.set(layout.scale);
 	videoSprite.position.set(layout.spriteX, layout.spriteY);
 
+	const maskRadius = scalePreviewBorderRadius(
+		layout.croppedDisplayWidth,
+		layout.croppedDisplayHeight,
+		borderRadius,
+		{ width, height },
+	);
+
 	maskGraphics.clear();
 	drawSquircleOnGraphics(maskGraphics, {
 		x: layout.centerOffsetX,
 		y: layout.centerOffsetY,
 		width: layout.croppedDisplayWidth,
 		height: layout.croppedDisplayHeight,
-		radius: scalePreviewBorderRadius(
-			layout.croppedDisplayWidth,
-			layout.croppedDisplayHeight,
-			borderRadius,
-			{ width, height },
-		),
+		radius: maskRadius,
 	});
 	maskGraphics.fill({ color: 0xffffff });
 
@@ -262,6 +265,7 @@ export function layoutVideoContent(params: LayoutParams): LayoutResult | null {
 			y: layout.centerOffsetY,
 			width: layout.croppedDisplayWidth,
 			height: layout.croppedDisplayHeight,
+			radius: maskRadius,
 			sourceCrop: crop,
 		},
 		cropBounds: {

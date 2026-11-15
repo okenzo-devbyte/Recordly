@@ -1,6 +1,7 @@
 import type { Span } from "dnd-timeline";
 import type { ForwardedRef, RefObject } from "react";
 import { useCallback, useImperativeHandle } from "react";
+import type { PlaybackClockStore } from "../../state/playbackClockStore";
 import type {
 	AnnotationRegion,
 	AudioRegion,
@@ -26,7 +27,8 @@ interface UseTimelineEditorRuntimeParams {
 	ref: ForwardedRef<TimelineEditorHandle>;
 	videoDuration: number;
 	totalMs: number;
-	currentTimeMs: number;
+	playbackClock?: PlaybackClockStore;
+	currentTimeMs?: number;
 	safeMinDurationMs: number;
 	cursorTelemetry: CursorTelemetryPoint[];
 	zoomRegions: ZoomRegion[];
@@ -78,7 +80,8 @@ export function useTimelineEditorRuntime({
 	ref,
 	videoDuration,
 	totalMs,
-	currentTimeMs,
+	playbackClock,
+	currentTimeMs = 0,
 	safeMinDurationMs,
 	cursorTelemetry,
 	zoomRegions,
@@ -120,6 +123,12 @@ export function useTimelineEditorRuntime({
 	keyShortcuts,
 	isTimelineFocusedRef,
 }: UseTimelineEditorRuntimeParams) {
+	const getCurrentTimeMs = useCallback(
+		() =>
+			playbackClock ? Math.round(playbackClock.getTimelineTime() * 1000) : currentTimeMs,
+		[currentTimeMs, playbackClock],
+	);
+
 	const {
 		keyframes,
 		selectedKeyframeId,
@@ -146,6 +155,7 @@ export function useTimelineEditorRuntime({
 	} = useTimelineSelection({
 		totalMs,
 		currentTimeMs,
+		getCurrentTimeMs,
 		zoomRegions,
 		clipRegions,
 		annotationRegions,
@@ -210,7 +220,7 @@ export function useTimelineEditorRuntime({
 		handleAddZoom,
 		handleSuggestZooms,
 	} = useTimelineZoomActions({
-		timeline: { videoDuration, totalMs, currentTimeMs },
+		timeline: { videoDuration, totalMs, currentTimeMs, getCurrentTimeMs },
 		regions: { zoom: zoomRegions, clip: clipRegions },
 		cursorTelemetry,
 		onZoomAdded,
@@ -228,11 +238,11 @@ export function useTimelineEditorRuntime({
 		if (!videoDuration || videoDuration === 0 || totalMs === 0 || !onClipSplit) {
 			return;
 		}
-		onClipSplit(currentTimeMs);
-	}, [videoDuration, totalMs, currentTimeMs, onClipSplit]);
+		onClipSplit(getCurrentTimeMs());
+	}, [videoDuration, totalMs, getCurrentTimeMs, onClipSplit]);
 
 	const { handleAddAudio } = useTimelineAudioActions({
-		timeline: { videoDuration, totalMs, currentTimeMs },
+		timeline: { videoDuration, totalMs, currentTimeMs, getCurrentTimeMs },
 		regions: { audio: audioRegions },
 		onAudioAdded,
 	});
@@ -253,11 +263,11 @@ export function useTimelineEditorRuntime({
 			}
 
 			const latestStartPos = Math.max(0, totalMs - defaultDuration);
-			const startPos = Math.max(0, Math.min(currentTimeMs, latestStartPos));
+			const startPos = Math.max(0, Math.min(getCurrentTimeMs(), latestStartPos));
 			const endPos = Math.min(startPos + defaultDuration, totalMs);
 			onAnnotationAdded({ start: startPos, end: endPos }, trackIndex, type, placement);
 		},
-		[videoDuration, totalMs, currentTimeMs, defaultRegionDurationMs, onAnnotationAdded],
+		[videoDuration, totalMs, getCurrentTimeMs, defaultRegionDurationMs, onAnnotationAdded],
 	);
 
 	useTimelineKeyboardShortcuts({

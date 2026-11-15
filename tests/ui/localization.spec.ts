@@ -23,6 +23,7 @@ const languageNames = [
 	"Português (Brasil)",
 	"简体中文",
 	"繁體中文",
+	"ภาษาไทย",
 ];
 const expectedUpgradeLabels: Record<(typeof SUPPORTED_LOCALES)[number], string> = {
 	en: "Upgrade",
@@ -36,6 +37,7 @@ const expectedUpgradeLabels: Record<(typeof SUPPORTED_LOCALES)[number], string> 
 	"pt-BR": "Fazer upgrade",
 	"zh-CN": "升级",
 	"zh-TW": "升級",
+	th: "อัปเกรด",
 };
 
 for (const [index, locale] of SUPPORTED_LOCALES.entries()) {

@@ -811,6 +811,19 @@ export function getHudOverlayWindow(): BrowserWindow | null {
 	return hudOverlayWindow && !hudOverlayWindow.isDestroyed() ? hudOverlayWindow : null;
 }
 
+export function closeIdleHudOverlayWindow(): boolean {
+	const hud = getHudOverlayWindow();
+	if (!hud || hudOverlayRecordingActive || hudCaptureStarting || recordingPreparationActive) {
+		return false;
+	}
+	const hasEditorWindow = Array.from(editorWindows).some((win) => !win.isDestroyed());
+	if (!hasEditorWindow) {
+		return false;
+	}
+	hud.close();
+	return true;
+}
+
 /**
  * Re-initialise the HUD overlay's mouse passthrough state.
  *
@@ -848,6 +861,10 @@ export function reassertHudOverlayMousePassthrough(): void {
 export function setHudOverlayRecordingActive(recording: boolean): void {
 	hudCaptureStarting = false;
 	hudOverlayRecordingActive = Boolean(recording);
+	const hud = getHudOverlayWindow();
+	if (hud && !hud.webContents.isDestroyed()) {
+		hud.webContents.setBackgroundThrottling(!recording);
+	}
 	notifyEditorMode();
 	hudOverlayFallbackExpanded = false;
 	applyHudOverlayBounds();
@@ -879,7 +896,7 @@ export function createUpdateToastWindow(): BrowserWindow {
 			preload: path.join(electronWindowsDir, "preload.js"),
 			nodeIntegration: false,
 			contextIsolation: true,
-			backgroundThrottling: false,
+			backgroundThrottling: true,
 		},
 	});
 

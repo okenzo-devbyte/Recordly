@@ -95,6 +95,11 @@ export class ModernExportFlowControl {
 				throw error;
 			})
 			.finally(() => {
+				if (this.session.native.nativeInputMode === "rawvideo") {
+					for (const chunk of chunks) {
+						this.session.native.releaseReadbackBuffer?.(chunk);
+					}
+				}
 				if (this.session.native.nativeExportSessionId === sessionId)
 					this.session.metrics.nativeWriteTimeMs += this.now() - writeStarted;
 			});

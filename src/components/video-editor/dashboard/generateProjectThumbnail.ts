@@ -1,5 +1,5 @@
 import type { ProjectPreviewData } from "@/types/projectPreview";
-import { FrameRenderer } from "@/lib/exporter/frameRenderer";
+import { FrameRenderer } from "@/lib/exporter/modernFrameRenderer";
 import {
 	captureProjectThumbnailCanvas,
 	getProjectThumbnailRenderSize,

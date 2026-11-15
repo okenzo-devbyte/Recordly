@@ -12,9 +12,12 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useI18n, useScopedT } from "@/contexts/I18nContext";
 import {
+	CAPTION_LANGUAGES,
 	CAPTION_MODELS,
 	type CaptionModelId,
 	getCaptionModel,
+	getPreferredWhisperModelForLanguage,
+	isCaptionLanguageSupportedByModel,
 	isCaptionModelId,
 } from "@/shared/captionModels";
 import { applyCaptionPreset } from "../captionPresets";
@@ -83,6 +86,21 @@ export function CaptionGenerationSettings({
 	const modelReady = Boolean(whisperModelPath) && whisperModelDownloadStatus === "downloaded";
 	const isBusy = isGeneratingCaptions || isDownloading || captionModelLoading;
 	const model = getCaptionModel(captionModelId);
+	const selectedLanguage = autoCaptionSettings.language || "auto";
+	const modelSupportsSelectedLanguage = isCaptionLanguageSupportedByModel(
+		selectedLanguage,
+		captionModelId,
+	);
+	const handleLanguageChange = (nextLanguage: string) => {
+		updateAutoCaptionSettings({ language: nextLanguage });
+		if (
+			!isBusy &&
+			onCaptionModelChange &&
+			!isCaptionLanguageSupportedByModel(nextLanguage, captionModelId)
+		) {
+			onCaptionModelChange(getPreferredWhisperModelForLanguage());
+		}
+	};
 
 	return (
 		<section className="flex flex-col gap-5">
@@ -109,6 +127,23 @@ export function CaptionGenerationSettings({
 						onCheckedChange={(enabled) => updateAutoCaptionSettings({ enabled })}
 					/>
 				</div>
+				<Select
+					aria-label={tSettings("captions.language", "Language")}
+					value={selectedLanguage}
+					disabled={isBusy}
+					onValueChange={handleLanguageChange}
+				>
+					<SelectTrigger className="h-9 w-full min-w-0 text-xs">
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent>
+						{CAPTION_LANGUAGES.map((code) => (
+							<SelectItem key={code} value={code}>
+								{te(`captionLanguage${code}`, code)}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
 				<Select
 					aria-label={tSettings("captions.speechModel", "Speech model")}
 					value={captionModelId}
@@ -150,11 +185,19 @@ export function CaptionGenerationSettings({
 					{" · "}
 					{tSettings("captions.wordTiming", "Word timing")}
 				</p>
+				{!modelSupportsSelectedLanguage && (
+					<p className="text-[11px] leading-relaxed text-amber-600 dark:text-amber-400">
+						{te(
+							"parakeetLanguageRequiresWhisper",
+							"Selected language requires Whisper Base or Whisper Small. Parakeet supports European languages only.",
+						)}
+					</p>
+				)}
 				<div className="flex items-center gap-2">
 					<Button
 						type="button"
 						onClick={onGenerateAutoCaptions}
-						disabled={isBusy}
+						disabled={isBusy || !modelSupportsSelectedLanguage}
 						className="h-auto min-h-9 min-w-0 flex-1 whitespace-normal px-3 py-2 text-sm"
 					>
 						{isDownloading ? (

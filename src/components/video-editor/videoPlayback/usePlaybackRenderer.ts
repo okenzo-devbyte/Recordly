@@ -5,6 +5,7 @@ import { destroyPixiApplication } from "@/lib/pixiApplicationLifecycle";
 import { DEFAULT_CURSOR_CONFIG, PixiCursorOverlay, preloadCursorAssets } from "./cursorRenderer";
 import { initializePixiRenderer, toRendererErrorMessage } from "./initializePreviewRenderer";
 import type { PlaybackProps } from "./playbackProps";
+import { createPreviewShadowController } from "./previewShadows";
 import type { usePlaybackLayout } from "./usePlaybackLayout";
 import type { usePlaybackState } from "./usePlaybackState";
 export type usePlaybackRendererInput = Pick<
@@ -13,6 +14,7 @@ export type usePlaybackRendererInput = Pick<
 	| "appRef"
 	| "cameraContainerRef"
 	| "videoEffectsContainerRef"
+	| "previewShadowControllerRef"
 	| "zoomBlurFilterRef"
 	| "motionBlurFilterRef"
 	| "syncPreviewMotionBlurQuality"
@@ -44,6 +46,7 @@ export function usePlaybackRenderer(input: usePlaybackRendererInput) {
 		appRef,
 		cameraContainerRef,
 		videoEffectsContainerRef,
+		previewShadowControllerRef,
 		zoomBlurFilterRef,
 		motionBlurFilterRef,
 		syncPreviewMotionBlurQuality,
@@ -111,6 +114,12 @@ export function usePlaybackRenderer(input: usePlaybackRendererInput) {
 			cameraContainerRef.current = cameraContainer;
 			app.stage.addChild(cameraContainer);
 
+			// Attach cached shadow sprites behind videoEffectsContainer so
+			// videoContainer.parent.parent continues to resolve to cameraContainer.
+			const previewShadowController = createPreviewShadowController();
+			previewShadowControllerRef.current = previewShadowController;
+			previewShadowController.attach(cameraContainer);
+
 			// Match the export scene graph so zoom motion blur is applied to the
 			// same layer in preview and export.
 			const videoEffectsContainer = new Container();
@@ -118,10 +127,7 @@ export function usePlaybackRenderer(input: usePlaybackRendererInput) {
 			const blurFilters = createVideoBlurFilters();
 			zoomBlurFilterRef.current = blurFilters.zoom;
 			motionBlurFilterRef.current = blurFilters.motion;
-			videoEffectsContainer.filters = [
-				motionBlurFilterRef.current,
-				zoomBlurFilterRef.current,
-			];
+			videoEffectsContainer.filters = null;
 			cameraContainer.addChild(videoEffectsContainer);
 			syncPreviewMotionBlurQuality();
 
@@ -180,6 +186,10 @@ export function usePlaybackRenderer(input: usePlaybackRendererInput) {
 				cursorOverlayRef.current.destroy();
 				cursorOverlayRef.current = null;
 			}
+			if (previewShadowControllerRef.current) {
+				previewShadowControllerRef.current.destroy();
+				previewShadowControllerRef.current = null;
+			}
 			if (videoEffectsContainerRef.current) {
 				videoEffectsContainerRef.current.filters = null;
 			}
@@ -201,6 +211,7 @@ export function usePlaybackRenderer(input: usePlaybackRendererInput) {
 		appRef,
 		cameraContainerRef,
 		videoEffectsContainerRef,
+		previewShadowControllerRef,
 		zoomBlurFilterRef,
 		motionBlurFilterRef,
 		videoContainerRef,

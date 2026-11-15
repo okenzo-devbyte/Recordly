@@ -20,6 +20,7 @@ vi.mock("react", () => ({
 		];
 	},
 	useEffect: (effect: () => void) => effect(),
+	useSyncExternalStore: (_subscribe: () => () => void, getSnapshot: () => unknown) => getSnapshot(),
 }));
 
 afterEach(() => vi.unstubAllGlobals());

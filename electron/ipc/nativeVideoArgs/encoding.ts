@@ -41,7 +41,21 @@ export function getPreferredNativeVideoEncoders(platform: NodeJS.Platform): stri
 	}
 }
 
-export function getLibx264ModeArgs(encodingMode: NativeExportEncodingMode): string[] {
+export function getLibx264ModeArgs(
+	encodingMode: NativeExportEncodingMode,
+	options?: { preferFastSoftwarePreset?: boolean },
+): string[] {
+	if (options?.preferFastSoftwarePreset) {
+		switch (encodingMode) {
+			case "fast":
+				return ["-preset", "ultrafast", "-tune", "zerolatency"];
+			case "quality":
+			case "balanced":
+			default:
+				return ["-preset", "veryfast"];
+		}
+	}
+
 	switch (encodingMode) {
 		case "fast":
 			return ["-preset", "ultrafast", "-tune", "zerolatency"];
@@ -167,7 +181,18 @@ export function buildNativeVideoExportArgs(
 		// Software fallback keeps files compact without the slow preset's extra CPU cost.
 		args.push("-preset", "medium", "-threads", "4");
 	} else if (encoder === "libx264") {
-		args.push(...getLibx264ModeArgs(options.encodingMode));
+		args.push(
+			...getLibx264ModeArgs(options.encodingMode, {
+				preferFastSoftwarePreset: options.preferFastSoftwarePreset,
+			}),
+		);
+		if (
+			typeof options.maxThreads === "number" &&
+			Number.isFinite(options.maxThreads) &&
+			options.maxThreads > 0
+		) {
+			args.push("-threads", String(Math.max(1, Math.floor(options.maxThreads))));
+		}
 	}
 
 	args.push(

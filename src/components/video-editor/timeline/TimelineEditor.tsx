@@ -9,6 +9,7 @@ import type {
 import { useScopedT } from "@/contexts/I18nContext";
 import { useShortcuts } from "@/contexts/ShortcutsContext";
 import { selectClipRange } from "../clipMerge";
+import type { PlaybackClockStore } from "../state/playbackClockStore";
 import type {
 	AnnotationRegion,
 	AudioRegion,
@@ -35,7 +36,8 @@ export interface TimelineEditorProps {
 	zoomPresentationOptions?: ZoomPresentationOptions;
 	videoDuration: number;
 	sourceDuration?: number;
-	currentTime: number;
+	playbackClock?: PlaybackClockStore;
+	currentTime?: number;
 	playheadTime?: number;
 	onSeek?: (time: number) => void;
 	cursorTelemetry?: CursorTelemetryPoint[];
@@ -112,7 +114,8 @@ const TimelineEditor = forwardRef<TimelineEditorHandle, TimelineEditorProps>(
 		{
 			videoDuration,
 			sourceDuration = videoDuration,
-			currentTime,
+			playbackClock,
+			currentTime = 0,
 			playheadTime,
 			onSeek,
 			cursorTelemetry = [],
@@ -331,6 +334,7 @@ const TimelineEditor = forwardRef<TimelineEditorHandle, TimelineEditorProps>(
 			ref,
 			videoDuration,
 			totalMs,
+			playbackClock,
 			currentTimeMs,
 			safeMinDurationMs,
 			cursorTelemetry: autoZoomTelemetry,
@@ -517,6 +521,7 @@ const TimelineEditor = forwardRef<TimelineEditorHandle, TimelineEditorProps>(
 							videoPath={videoPath}
 							items={timelineItems}
 							videoDurationMs={totalMs}
+							playbackClock={playbackClock}
 							currentTimeMs={currentTimeMs}
 							onSeek={onSeek}
 							onApplyAutoZooms={

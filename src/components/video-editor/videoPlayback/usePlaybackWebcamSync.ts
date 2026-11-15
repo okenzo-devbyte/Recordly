@@ -26,6 +26,8 @@ export type usePlaybackWebcamSyncInput = Pick<
 	| "webcam"
 	| "webcamVideoPath"
 	| "currentTimeRef"
+	| "timelineTimeRef"
+	| "playbackClock"
 	| "webcamTimeOffsetMs"
 	| "webcamSynchronizedPathRef"
 	| "setWebcamSynchronizedPath"
@@ -33,6 +35,7 @@ export type usePlaybackWebcamSyncInput = Pick<
 	| "timelineTime"
 	| "clipRegions"
 	| "isPlaying"
+	| "isPlayingRef"
 	| "setWebcamVideoDimensions"
 	| "webcamMotionBlurRef"
 	| "lastBackgroundSyncTimeRef"
@@ -51,6 +54,8 @@ export function usePlaybackWebcamSync(input: usePlaybackWebcamSyncInput) {
 		webcam,
 		webcamVideoPath,
 		currentTimeRef,
+		timelineTimeRef,
+		playbackClock,
 		webcamTimeOffsetMs,
 		webcamSynchronizedPathRef,
 		setWebcamSynchronizedPath,
@@ -58,6 +63,7 @@ export function usePlaybackWebcamSync(input: usePlaybackWebcamSyncInput) {
 		timelineTime,
 		clipRegions,
 		isPlaying,
+		isPlayingRef,
 		setWebcamVideoDimensions,
 		webcamMotionBlurRef,
 		lastBackgroundSyncTimeRef,
@@ -77,9 +83,17 @@ export function usePlaybackWebcamSync(input: usePlaybackWebcamSyncInput) {
 			return;
 		}
 
+		const activeTimelineTime = playbackClock
+			? playbackClock.getTimelineTime()
+			: timelineTimeRef.current;
+		const activeSourceTime = playbackClock
+			? playbackClock.getSourceTime()
+			: currentTimeRef.current / 1000;
+		const activePlaying = playbackClock ? isPlayingRef.current : isPlaying;
+
 		const webcamDuration = Number.isFinite(webcamVideo.duration) ? webcamVideo.duration : null;
 		const targetTime = getWebcamMediaTargetTimeSeconds({
-			currentTime: currentTimeRef.current / 1000,
+			currentTime: activeSourceTime,
 			webcamDuration,
 			timeOffsetMs: webcamTimeOffsetMs,
 			loop: webcam?.loop,
@@ -120,7 +134,7 @@ export function usePlaybackWebcamSync(input: usePlaybackWebcamSyncInput) {
 		}
 
 		const targetPlaybackRate =
-			findClipAtTimelineTime(timelineTime * 1000, clipRegions)?.speed ?? 1;
+			findClipAtTimelineTime(activeTimelineTime * 1000, clipRegions)?.speed ?? 1;
 		if (!supportsPreviewPlaybackRate(targetPlaybackRate)) {
 			webcamVideo.pause();
 			return;
@@ -134,7 +148,7 @@ export function usePlaybackWebcamSync(input: usePlaybackWebcamSyncInput) {
 		if (
 			shouldSeekWebcamMedia({
 				desiredTime: mediaTargetTime,
-				isPlaying,
+				isPlaying: activePlaying,
 				isSeeking: webcamVideo.seeking,
 				previousTimelineTime,
 				timelineTime: targetTime,
@@ -148,7 +162,7 @@ export function usePlaybackWebcamSync(input: usePlaybackWebcamSyncInput) {
 			}
 		}
 
-		if (isPlaying) {
+		if (activePlaying) {
 			const playPromise = webcamVideo.play();
 			if (playPromise) {
 				playPromise.catch(() => undefined);
@@ -159,14 +173,16 @@ export function usePlaybackWebcamSync(input: usePlaybackWebcamSyncInput) {
 
 		lastWebcamSyncTimeRef.current = targetTime;
 	}, [
-		timelineTime,
+		playbackClock,
 		clipRegions,
 		isPlaying,
+		isPlayingRef,
 		webcamEnabled,
 		webcam?.loop,
 		webcamTimeOffsetMs,
 		webcamVideoPath,
 		webcamVideoRef,
+		timelineTimeRef,
 		currentTimeRef,
 		webcamSynchronizedPathRef,
 		setWebcamSynchronizedPath,
@@ -189,9 +205,17 @@ export function usePlaybackWebcamSync(input: usePlaybackWebcamSyncInput) {
 		[syncWebcamMedia, setWebcamVideoDimensions, applyWebcamBubbleLayout, animationStateRef],
 	);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: timelineTime is only used when external playbackClock is omitted.
 	useEffect(() => {
 		syncWebcamMedia();
-	}, [syncWebcamMedia]);
+	}, [syncWebcamMedia, playbackClock ? null : timelineTime]);
+
+	useEffect(() => {
+		if (!playbackClock) return;
+		return playbackClock.subscribe(() => {
+			syncWebcamMedia();
+		});
+	}, [playbackClock, syncWebcamMedia]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: The media path intentionally triggers source-specific state reset.
 	useEffect(() => {

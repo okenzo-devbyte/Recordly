@@ -101,36 +101,57 @@ bool MFEncoder::initialize(const std::wstring& outputPath, int width, int height
 
     // Create SinkWriter with MPEG4 container
     ComPtr<IMFAttributes> writerAttrs;
-    hr = MFCreateAttributes(&writerAttrs, 1);
+    hr = MFCreateAttributes(&writerAttrs, 3);
     if (FAILED(hr)) return false;
 
     writerAttrs->SetUINT32(MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, TRUE);
+    writerAttrs->SetUINT32(MF_LOW_LATENCY, TRUE);
+
+    gpuPipelineEnabled_ = initializeGpuVideoProcessorLocked();
+    if (gpuPipelineEnabled_ && dxgiDeviceManager_) {
+        writerAttrs->SetUnknown(MF_SINK_WRITER_D3D_MANAGER, dxgiDeviceManager_.Get());
+    }
 
     hr = MFCreateSinkWriterFromURL(outputPath.c_str(), nullptr, writerAttrs.Get(), &sinkWriter_);
+    if (FAILED(hr) && gpuPipelineEnabled_) {
+        std::cerr << "WARN: MFCreateSinkWriterFromURL with D3D manager failed (0x"
+                  << std::hex << hr << std::dec << "), falling back to CPU staging" << std::endl;
+        releaseGpuVideoProcessorLocked();
+        writerAttrs.Reset();
+        if (SUCCEEDED(MFCreateAttributes(&writerAttrs, 2))) {
+            writerAttrs->SetUINT32(MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, TRUE);
+            writerAttrs->SetUINT32(MF_LOW_LATENCY, TRUE);
+            hr = MFCreateSinkWriterFromURL(outputPath.c_str(), nullptr, writerAttrs.Get(), &sinkWriter_);
+        }
+    }
     if (FAILED(hr)) {
         std::cerr << "ERROR: MFCreateSinkWriterFromURL failed: 0x" << std::hex << hr << std::endl;
+        releaseGpuVideoProcessorLocked();
         return false;
     }
 
     hr = sinkWriter_->AddStream(outputType.Get(), &streamIndex_);
     if (FAILED(hr)) {
         std::cerr << "ERROR: AddStream failed: 0x" << std::hex << hr << std::endl;
+        releaseGpuVideoProcessorLocked();
         return false;
     }
 
     hr = sinkWriter_->SetInputMediaType(streamIndex_, inputType.Get(), nullptr);
     if (FAILED(hr)) {
         std::cerr << "ERROR: SetInputMediaType failed: 0x" << std::hex << hr << std::endl;
+        releaseGpuVideoProcessorLocked();
         return false;
     }
 
     hr = sinkWriter_->BeginWriting();
     if (FAILED(hr)) {
         std::cerr << "ERROR: BeginWriting failed: 0x" << std::hex << hr << std::endl;
+        releaseGpuVideoProcessorLocked();
         return false;
     }
 
-    // Pre-allocate staging texture
+    // Pre-allocate staging texture (kept ready for transparent fallback if GPU path fails)
     D3D11_TEXTURE2D_DESC stagingDesc = {};
     stagingDesc.Width = width_;
     stagingDesc.Height = height_;
@@ -144,12 +165,13 @@ bool MFEncoder::initialize(const std::wstring& outputPath, int width, int height
     hr = device_->CreateTexture2D(&stagingDesc, nullptr, &stagingTexture_);
     if (FAILED(hr)) {
         std::cerr << "ERROR: Failed to create staging texture: 0x" << std::hex << hr << std::endl;
+        releaseGpuVideoProcessorLocked();
         return false;
     }
 
     // WGC window captures can change frame size while recording. Keep the muxer
     // output dimensions stable by compositing resized frames into this fixed
-    // BGRA surface before CPU readback.
+    // BGRA surface before GPU conversion or CPU readback.
     D3D11_TEXTURE2D_DESC compositeDesc = {};
     compositeDesc.Width = width_;
     compositeDesc.Height = height_;
@@ -158,29 +180,213 @@ bool MFEncoder::initialize(const std::wstring& outputPath, int width, int height
     compositeDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
     compositeDesc.SampleDesc.Count = 1;
     compositeDesc.Usage = D3D11_USAGE_DEFAULT;
-    compositeDesc.BindFlags = D3D11_BIND_RENDER_TARGET;
+    compositeDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
 
     hr = device_->CreateTexture2D(&compositeDesc, nullptr, &resizeCompositeTexture_);
     if (FAILED(hr)) {
+        compositeDesc.BindFlags = D3D11_BIND_RENDER_TARGET;
+        hr = device_->CreateTexture2D(&compositeDesc, nullptr, &resizeCompositeTexture_);
+    }
+    if (FAILED(hr)) {
         std::cerr << "ERROR: Failed to create resize composite texture: 0x" << std::hex << hr << std::endl;
+        releaseGpuVideoProcessorLocked();
         return false;
     }
 
     hr = device_->CreateRenderTargetView(resizeCompositeTexture_.Get(), nullptr, &resizeCompositeView_);
     if (FAILED(hr)) {
         std::cerr << "ERROR: Failed to create resize composite view: 0x" << std::hex << hr << std::endl;
+        releaseGpuVideoProcessorLocked();
         return false;
     }
 
-    // Pre-allocate NV12 buffer
+    // Pre-allocate NV12 buffer (used only when CPU fallback is active)
     const int ySize = width_ * height_;
     const int uvSize = (width_ / 2) * (height_ / 2) * 2;
     nv12Buffer_.resize(ySize + uvSize);
     lastFrameBuffer_.clear();
+    hasLastGpuFrame_ = false;
     firstSampleTimeHns_ = -1;
     lastSampleEndTimeHns_ = -1;
 
     initialized_ = true;
+    return true;
+}
+
+bool MFEncoder::initializeGpuVideoProcessorLocked() {
+    if (!device_ || !context_) return false;
+
+    ComPtr<ID3D10Multithread> multithread;
+    if (SUCCEEDED(device_->QueryInterface(IID_PPV_ARGS(&multithread))) && multithread) {
+        multithread->SetMultithreadProtected(TRUE);
+    }
+
+    HRESULT hr = device_->QueryInterface(IID_PPV_ARGS(&videoDevice_));
+    if (FAILED(hr) || !videoDevice_) return false;
+
+    hr = context_->QueryInterface(IID_PPV_ARGS(&videoContext_));
+    if (FAILED(hr) || !videoContext_) {
+        releaseGpuVideoProcessorLocked();
+        return false;
+    }
+
+    hr = MFCreateDXGIDeviceManager(&dxgiResetToken_, &dxgiDeviceManager_);
+    if (FAILED(hr) || !dxgiDeviceManager_) {
+        releaseGpuVideoProcessorLocked();
+        return false;
+    }
+
+    hr = dxgiDeviceManager_->ResetDevice(device_, dxgiResetToken_);
+    if (FAILED(hr)) {
+        releaseGpuVideoProcessorLocked();
+        return false;
+    }
+
+    D3D11_VIDEO_PROCESSOR_CONTENT_DESC contentDesc = {};
+    contentDesc.InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE;
+    contentDesc.InputFrameRate.Numerator = static_cast<UINT>((std::max)(fps_, 1));
+    contentDesc.InputFrameRate.Denominator = 1;
+    contentDesc.InputWidth = static_cast<UINT>(width_);
+    contentDesc.InputHeight = static_cast<UINT>(height_);
+    contentDesc.OutputFrameRate.Numerator = static_cast<UINT>((std::max)(fps_, 1));
+    contentDesc.OutputFrameRate.Denominator = 1;
+    contentDesc.OutputWidth = static_cast<UINT>(width_);
+    contentDesc.OutputHeight = static_cast<UINT>(height_);
+    contentDesc.Usage = D3D11_VIDEO_USAGE_PLAYBACK_NORMAL;
+
+    hr = videoDevice_->CreateVideoProcessorEnumerator(&contentDesc, &videoProcessorEnum_);
+    if (FAILED(hr) || !videoProcessorEnum_) {
+        releaseGpuVideoProcessorLocked();
+        return false;
+    }
+
+    hr = videoDevice_->CreateVideoProcessor(videoProcessorEnum_.Get(), 0, &videoProcessor_);
+    if (FAILED(hr) || !videoProcessor_) {
+        releaseGpuVideoProcessorLocked();
+        return false;
+    }
+
+    D3D11_VIDEO_PROCESSOR_COLOR_SPACE inputColorSpace = {};
+    inputColorSpace.Usage = 0;
+    inputColorSpace.RGB_Range = 0; // Full range [0..255] desktop BGRA
+    inputColorSpace.YCbCr_Matrix = 1; // BT.709
+    inputColorSpace.Nominal_Range = D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_0_255;
+    videoContext_->VideoProcessorSetStreamColorSpace(videoProcessor_.Get(), 0, &inputColorSpace);
+
+    D3D11_VIDEO_PROCESSOR_COLOR_SPACE outputColorSpace = {};
+    outputColorSpace.Usage = 0;
+    outputColorSpace.RGB_Range = 1;
+    outputColorSpace.YCbCr_Matrix = 1; // BT.709
+    outputColorSpace.Nominal_Range = D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_16_235;
+    videoContext_->VideoProcessorSetOutputColorSpace(videoProcessor_.Get(), &outputColorSpace);
+
+    D3D11_TEXTURE2D_DESC nv12Desc = {};
+    nv12Desc.Width = static_cast<UINT>(width_);
+    nv12Desc.Height = static_cast<UINT>(height_);
+    nv12Desc.MipLevels = 1;
+    nv12Desc.ArraySize = 1;
+    nv12Desc.Format = DXGI_FORMAT_NV12;
+    nv12Desc.SampleDesc.Count = 1;
+    nv12Desc.Usage = D3D11_USAGE_DEFAULT;
+    nv12Desc.BindFlags = D3D11_BIND_RENDER_TARGET;
+
+    D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC outputViewDesc = {};
+    outputViewDesc.ViewDimension = D3D11_VPOV_DIMENSION_TEXTURE2D;
+    outputViewDesc.Texture2D.MipSlice = 0;
+
+    for (size_t i = 0; i < kGpuNv12PoolSize; ++i) {
+        hr = device_->CreateTexture2D(&nv12Desc, nullptr, &gpuNv12Textures_[i]);
+        if (FAILED(hr) || !gpuNv12Textures_[i]) {
+            releaseGpuVideoProcessorLocked();
+            return false;
+        }
+        hr = videoDevice_->CreateVideoProcessorOutputView(
+            gpuNv12Textures_[i].Get(),
+            videoProcessorEnum_.Get(),
+            &outputViewDesc,
+            &gpuNv12OutputViews_[i]);
+        if (FAILED(hr) || !gpuNv12OutputViews_[i]) {
+            releaseGpuVideoProcessorLocked();
+            return false;
+        }
+    }
+
+    hr = device_->CreateTexture2D(&nv12Desc, nullptr, &lastGpuFrameTexture_);
+    if (FAILED(hr) || !lastGpuFrameTexture_) {
+        releaseGpuVideoProcessorLocked();
+        return false;
+    }
+
+    gpuNv12PoolIndex_ = 0;
+    hasLastGpuFrame_ = false;
+    std::cerr << "INFO: Initialized zero-copy D3D11 video processor (BGRA -> NV12) for WGC capture" << std::endl;
+    return true;
+}
+
+void MFEncoder::releaseGpuVideoProcessorLocked() {
+    gpuPipelineEnabled_ = false;
+    hasLastGpuFrame_ = false;
+    lastGpuFrameTexture_.Reset();
+    for (size_t i = 0; i < kGpuNv12PoolSize; ++i) {
+        gpuNv12OutputViews_[i].Reset();
+        gpuNv12Textures_[i].Reset();
+    }
+    videoProcessor_.Reset();
+    videoProcessorEnum_.Reset();
+    videoContext_.Reset();
+    videoDevice_.Reset();
+    dxgiDeviceManager_.Reset();
+    dxgiResetToken_ = 0;
+}
+
+bool MFEncoder::convertBgraTextureToGpuNv12Locked(
+    ID3D11Texture2D* sourceBgraTexture,
+    ID3D11Texture2D** outNv12Texture
+) {
+    if (!gpuPipelineEnabled_ || !videoDevice_ || !videoContext_ || !videoProcessor_ || !videoProcessorEnum_) {
+        return false;
+    }
+
+    D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC inputViewDesc = {};
+    inputViewDesc.FourCC = 0;
+    inputViewDesc.ViewDimension = D3D11_VPIV_DIMENSION_TEXTURE2D;
+    inputViewDesc.Texture2D.MipSlice = 0;
+    inputViewDesc.Texture2D.ArraySlice = 0;
+
+    ComPtr<ID3D11VideoProcessorInputView> inputView;
+    HRESULT hr = videoDevice_->CreateVideoProcessorInputView(
+        sourceBgraTexture,
+        videoProcessorEnum_.Get(),
+        &inputViewDesc,
+        &inputView);
+    if (FAILED(hr) || !inputView) {
+        return false;
+    }
+
+    const size_t slot = gpuNv12PoolIndex_ % kGpuNv12PoolSize;
+    gpuNv12PoolIndex_ = (gpuNv12PoolIndex_ + 1) % kGpuNv12PoolSize;
+
+    ID3D11Texture2D* targetNv12 = gpuNv12Textures_[slot].Get();
+    ID3D11VideoProcessorOutputView* outputView = gpuNv12OutputViews_[slot].Get();
+    if (!targetNv12 || !outputView) {
+        return false;
+    }
+
+    D3D11_VIDEO_PROCESSOR_STREAM stream = {};
+    stream.Enable = TRUE;
+    stream.pInputSurface = inputView.Get();
+
+    hr = videoContext_->VideoProcessorBlt(
+        videoProcessor_.Get(),
+        outputView,
+        0,
+        1,
+        &stream);
+    if (FAILED(hr)) {
+        return false;
+    }
+
+    *outNv12Texture = targetNv12;
     return true;
 }
 
@@ -192,10 +398,9 @@ bool MFEncoder::writeFrame(ID3D11Texture2D* texture, int64_t timestampHns) {
     D3D11_TEXTURE2D_DESC sourceDesc = {};
     texture->GetDesc(&sourceDesc);
 
-    if (sourceDesc.Width == static_cast<UINT>(width_) &&
-        sourceDesc.Height == static_cast<UINT>(height_)) {
-        context_->CopyResource(stagingTexture_.Get(), texture);
-    } else {
+    ID3D11Texture2D* sourceBgraTexture = texture;
+    if (sourceDesc.Width != static_cast<UINT>(width_) ||
+        sourceDesc.Height != static_cast<UINT>(height_)) {
         if (!resizeCompositeTexture_ || !resizeCompositeView_) return false;
 
         const FLOAT clearColor[4] = {0.0f, 0.0f, 0.0f, 1.0f};
@@ -220,8 +425,33 @@ bool MFEncoder::writeFrame(ID3D11Texture2D* texture, int64_t timestampHns) {
             texture,
             0,
             &sourceBox);
-        context_->CopyResource(stagingTexture_.Get(), resizeCompositeTexture_.Get());
+        sourceBgraTexture = resizeCompositeTexture_.Get();
     }
+
+    int64_t normalizedTimestampHns = 0;
+    normalizeWriteTimestampHnsLocked(timestampHns, normalizedTimestampHns);
+    const int64_t frameDurationHns = 10000000LL / fps_;
+
+    // Fast path: GPU BGRA -> NV12 conversion + DXGI surface sample
+    if (gpuPipelineEnabled_) {
+        ID3D11Texture2D* nv12Texture = nullptr;
+        if (convertBgraTextureToGpuNv12Locked(sourceBgraTexture, &nv12Texture) && nv12Texture) {
+            if (hasLastGpuFrame_ && !extendLastFrameToLocked(normalizedTimestampHns, false)) {
+                return false;
+            }
+            if (writeGpuNv12SampleLocked(nv12Texture, normalizedTimestampHns, frameDurationHns)) {
+                if (lastGpuFrameTexture_) {
+                    context_->CopyResource(lastGpuFrameTexture_.Get(), nv12Texture);
+                    hasLastGpuFrame_ = true;
+                }
+                return true;
+            }
+        }
+        std::cerr << "WARN: GPU NV12 encode path failed; falling back to CPU staging" << std::endl;
+        gpuPipelineEnabled_ = false;
+    }
+
+    context_->CopyResource(stagingTexture_.Get(), sourceBgraTexture);
 
     D3D11_MAPPED_SUBRESOURCE mapped;
     HRESULT hr = context_->Map(stagingTexture_.Get(), 0, D3D11_MAP_READ, 0, &mapped);
@@ -236,18 +466,17 @@ bool MFEncoder::writeFrame(ID3D11Texture2D* texture, int64_t timestampHns) {
 
     // WGC may stop delivering frames while the scene is static; keep the MP4
     // timeline continuous with one duration-bearing sample for each gap.
-    int64_t normalizedTimestampHns = 0;
-    normalizeWriteTimestampHnsLocked(timestampHns, normalizedTimestampHns);
-
     if (!lastFrameBuffer_.empty() && !extendLastFrameToLocked(normalizedTimestampHns, false)) {
         return false;
     }
 
-    const int64_t frameDurationHns = 10000000LL / fps_;
     bool wroteSample = writeNv12SampleLocked(
         nv12Buffer_, normalizedTimestampHns, frameDurationHns);
     if (wroteSample) {
-        lastFrameBuffer_ = nv12Buffer_;
+        if (lastFrameBuffer_.size() != nv12Buffer_.size()) {
+            lastFrameBuffer_.resize(nv12Buffer_.size());
+        }
+        std::swap(nv12Buffer_, lastFrameBuffer_);
     }
     return wroteSample;
 }
@@ -289,7 +518,11 @@ bool MFEncoder::normalizeTimelineTimestampHnsLocked(
 
 bool MFEncoder::extendLastFrameToLocked(int64_t timestampHns, bool includePartialFrame) {
     if (!initialized_ || !sinkWriter_) return false;
-    if (lastFrameBuffer_.empty()) return false;
+    if (gpuPipelineEnabled_) {
+        if (!hasLastGpuFrame_ || !lastGpuFrameTexture_) return false;
+    } else if (lastFrameBuffer_.empty()) {
+        return false;
+    }
     if (lastSampleEndTimeHns_ < 0) return false;
 
     if (fps_ <= 0) return false;
@@ -304,8 +537,57 @@ bool MFEncoder::extendLastFrameToLocked(int64_t timestampHns, bool includePartia
     // Encoding a duplicate at every nominal frame interval creates unbounded
     // work after a static scene or a slow encoder. One sample holds the same
     // image through the entire gap, including a fractional final frame at Stop.
+    if (gpuPipelineEnabled_ && hasLastGpuFrame_ && lastGpuFrameTexture_) {
+        return writeGpuNv12SampleLocked(
+            lastGpuFrameTexture_.Get(), padding.timestampHns, padding.durationHns);
+    }
     return writeNv12SampleLocked(
         lastFrameBuffer_, padding.timestampHns, padding.durationHns);
+}
+
+bool MFEncoder::writeGpuNv12SampleLocked(
+    ID3D11Texture2D* nv12Texture,
+    int64_t timestampHns,
+    int64_t durationHns
+) {
+    if (!nv12Texture || durationHns <= 0) return false;
+
+    ComPtr<IMFMediaBuffer> buffer;
+    HRESULT hr = MFCreateDXGISurfaceBuffer(
+        __uuidof(ID3D11Texture2D),
+        nv12Texture,
+        0,
+        FALSE,
+        &buffer);
+    if (FAILED(hr) || !buffer) return false;
+
+    const DWORD frameBytes = static_cast<DWORD>(width_ * height_ * 3 / 2);
+    ComPtr<IMF2DBuffer> buffer2D;
+    DWORD contiguousLength = frameBytes;
+    if (SUCCEEDED(buffer.As(&buffer2D)) && buffer2D) {
+        DWORD queriedLength = 0;
+        if (SUCCEEDED(buffer2D->GetContiguousLength(&queriedLength)) && queriedLength > 0) {
+            contiguousLength = queriedLength;
+        }
+    }
+    buffer->SetCurrentLength(contiguousLength);
+
+    ComPtr<IMFSample> sample;
+    hr = MFCreateSample(&sample);
+    if (FAILED(hr) || !sample) return false;
+
+    sample->AddBuffer(buffer.Get());
+    sample->SetSampleTime(timestampHns);
+    sample->SetSampleDuration(durationHns);
+
+    hr = sinkWriter_->WriteSample(streamIndex_, sample.Get());
+    if (FAILED(hr)) {
+        std::cerr << "ERROR: WriteSample (DXGI surface) failed: 0x" << std::hex << hr << std::dec << std::endl;
+        return false;
+    }
+
+    lastSampleEndTimeHns_ = timestampHns + durationHns;
+    return true;
 }
 
 bool MFEncoder::writeNv12SampleLocked(
@@ -360,6 +642,7 @@ bool MFEncoder::finalize() {
 
     initialized_ = false;
     sinkWriter_.Reset();
+    releaseGpuVideoProcessorLocked();
     stagingTexture_.Reset();
     resizeCompositeView_.Reset();
     resizeCompositeTexture_.Reset();

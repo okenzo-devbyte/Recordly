@@ -172,5 +172,7 @@
 	"mergeClipsUnavailable": "La fusion nécessite des séquences continues avec une vitesse et des réglages audio identiques.",
 	"mergeClips": "Fusionner les clips",
 	"captionStyleClassic": "Classique",
-	"captionStyleReveal": "Révélation"
+	"captionStyleReveal": "Révélation",
+	"captionLanguageth": "Thaï",
+	"parakeetLanguageRequiresWhisper": "La langue sélectionnée nécessite Whisper Base ou Whisper Small. Parakeet ne prend en charge que les langues européennes."
 }

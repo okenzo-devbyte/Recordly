@@ -12,6 +12,7 @@ const countries: Record<AppLocale, string> = {
 	"pt-BR": "BR",
 	"zh-CN": "CN",
 	"zh-TW": "TW",
+	th: "TH",
 };
 
 function star(cx: number, cy: number, radius: number, rotation = -90) {
@@ -136,6 +137,13 @@ export function LanguageFlag({ locale }: { locale: AppLocale }) {
 						))}
 						<circle cx="6" cy="4" r="1.4" stroke="#000095" strokeWidth=".3" />
 					</g>
+				</>
+			)}
+			{locale === "th" && (
+				<>
+					<path fill="#a51931" d="M0 0h24v2.667H0zm0 13.333h24V16H0z" />
+					<path fill="#f4f5f8" d="M0 2.667h24v2.666H0zm0 8h24v2.666H0z" />
+					<path fill="#2d2a4a" d="M0 5.333h24v5.334H0z" />
 				</>
 			)}
 		</svg>

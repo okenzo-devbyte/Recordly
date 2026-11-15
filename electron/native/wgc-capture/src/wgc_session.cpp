@@ -49,7 +49,7 @@ bool WgcSession::createD3DDevice() {
         nullptr,
         D3D_DRIVER_TYPE_HARDWARE,
         nullptr,
-        D3D11_CREATE_DEVICE_BGRA_SUPPORT,
+        D3D11_CREATE_DEVICE_BGRA_SUPPORT | D3D11_CREATE_DEVICE_VIDEO_SUPPORT,
         featureLevels,
         ARRAYSIZE(featureLevels),
         D3D11_SDK_VERSION,
@@ -58,8 +58,27 @@ bool WgcSession::createD3DDevice() {
         &d3dContext_);
 
     if (FAILED(hr)) {
+        hr = D3D11CreateDevice(
+            nullptr,
+            D3D_DRIVER_TYPE_HARDWARE,
+            nullptr,
+            D3D11_CREATE_DEVICE_BGRA_SUPPORT,
+            featureLevels,
+            ARRAYSIZE(featureLevels),
+            D3D11_SDK_VERSION,
+            &d3dDevice_,
+            nullptr,
+            &d3dContext_);
+    }
+
+    if (FAILED(hr)) {
         std::cerr << "ERROR: D3D11CreateDevice failed: 0x" << std::hex << hr << std::endl;
         return false;
+    }
+
+    ComPtr<ID3D10Multithread> multithread;
+    if (SUCCEEDED(d3dDevice_.As(&multithread)) && multithread) {
+        multithread->SetMultithreadProtected(TRUE);
     }
 
     return true;

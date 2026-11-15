@@ -1,5 +1,7 @@
-import { Fragment } from "react";
+import { Fragment, useSyncExternalStore } from "react";
 import { getSquircleCssRadius } from "@/lib/geometry/squircle";
+import type { ActiveCaptionLayout } from "../captionLayout";
+import { withCaptionThaiFallback } from "../captionFonts";
 import {
 	getCaptionBackground,
 	getCaptionDisplayText,
@@ -17,11 +19,13 @@ import {
 	getCaptionWordVisualState,
 } from "../captionStyle";
 import type { PlaybackViewInput } from "./PlaybackView";
+
+const noopSubscribe = () => () => undefined;
+
 export function PlaybackCaptions(
 	input: Pick<
 		PlaybackViewInput,
 		| "isGap"
-		| "activeCaptionLayout"
 		| "autoCaptionSettings"
 		| "onEditAutoCaption"
 		| "captionBoxRef"
@@ -37,11 +41,17 @@ export function PlaybackCaptions(
 		| "commitCaptionEdit"
 		| "cancelCaptionEdit"
 		| "captionEditTextMetrics"
-	>,
+	> &
+		Partial<Pick<PlaybackViewInput, "preparedCaptionLayout" | "playbackClock" | "currentTime">> & {
+			activeCaptionLayout?: ActiveCaptionLayout | null;
+		},
 ) {
 	const {
 		isGap,
-		activeCaptionLayout,
+		activeCaptionLayout: providedActiveCaptionLayout,
+		preparedCaptionLayout,
+		playbackClock,
+		currentTime = 0,
 		autoCaptionSettings,
 		onEditAutoCaption,
 		captionBoxRef,
@@ -58,7 +68,23 @@ export function PlaybackCaptions(
 		cancelCaptionEdit,
 		captionEditTextMetrics,
 	} = input;
+	const shouldSubscribeClock = Boolean(
+		playbackClock && preparedCaptionLayout && autoCaptionSettings?.enabled && !isGap,
+	);
+	const clockSourceTime = useSyncExternalStore(
+		shouldSubscribeClock && playbackClock ? playbackClock.subscribe : noopSubscribe,
+		() => (shouldSubscribeClock && playbackClock ? playbackClock.getSourceTime() : -1),
+	);
+	const activeCaptionLayout = preparedCaptionLayout
+		? (preparedCaptionLayout(
+				Math.round((shouldSubscribeClock ? clockSourceTime : currentTime) * 1000),
+			) ?? null)
+		: (providedActiveCaptionLayout ?? null);
 	const preset = getCaptionPreset(autoCaptionSettings?.style);
+	const resolvedCaptionFontFamily = withCaptionThaiFallback(
+		captionFontFamily,
+		activeCaptionLayout?.cue.text ?? captionEditSession?.draft,
+	);
 	const fontSize = autoCaptionSettings
 		? getCaptionScaledFontSize(
 				autoCaptionSettings.fontSize,
@@ -122,7 +148,7 @@ export function PlaybackCaptions(
 						boxShadow: preset.borderEm
 							? `inset 0 0 0 ${preset.borderEm}em rgba(0, 0, 0, 0.12)`
 							: undefined,
-						fontFamily: captionFontFamily,
+						fontFamily: resolvedCaptionFontFamily,
 						fontSize: `${getCaptionScaledFontSize(
 							autoCaptionSettings.fontSize,
 							overlayRef.current?.clientWidth || 960,

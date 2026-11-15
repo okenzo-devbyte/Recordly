@@ -23,11 +23,13 @@ export function useLaunchWindowActions() {
 		if (result.canceled) return;
 		if (result.success && result.kind === "project") {
 			await window.electronAPI.switchToEditor();
+			window.electronAPI.hudOverlayClose?.();
 			return;
 		}
 		if (result.success && result.path) {
 			await window.electronAPI.setCurrentVideoPath(result.path);
 			await window.electronAPI.switchToEditor();
+			window.electronAPI.hudOverlayClose?.();
 		}
 	}, []);
 
@@ -47,6 +49,7 @@ export function useLaunchWindowActions() {
 				return;
 			}
 			await window.electronAPI.switchToEditor();
+			window.electronAPI.hudOverlayClose?.();
 		} catch (error) {
 			console.error("Failed to open project from library:", error);
 		}

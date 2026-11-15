@@ -316,6 +316,37 @@ describe("caption generation settings controls", () => {
 		);
 		expect(radius.formatValue(17.5)).toBe("17,5px");
 	});
+
+	it("auto-switches from Parakeet to Whisper Base when selecting Thai", () => {
+		const onAutoCaptionSettingsChange = vi.fn();
+		const onCaptionModelChange = vi.fn();
+		const tree = captionView({
+			captionModelId: "parakeet-v3",
+			onAutoCaptionSettingsChange,
+			onCaptionModelChange,
+		});
+		control(tree, Select, (props) => props["aria-label"] === "Language").onValueChange?.("th");
+		expect(onAutoCaptionSettingsChange).toHaveBeenCalledWith({
+			...DEFAULT_AUTO_CAPTION_SETTINGS,
+			fontFamily: "Saved font",
+			language: "th",
+		});
+		expect(onCaptionModelChange).toHaveBeenCalledWith("whisper-base");
+	});
+
+	it("disables caption generation when Parakeet is paired with Thai", () => {
+		const tree = captionView({
+			captionModelId: "parakeet-v3",
+			autoCaptionSettings: {
+				...DEFAULT_AUTO_CAPTION_SETTINGS,
+				fontFamily: "Saved font",
+				language: "th",
+			},
+		});
+		expect(
+			control(tree, Button, (props) => props.children === "Regenerate Captions").disabled,
+		).toBe(true);
+	});
 });
 
 it("clears a click-effect choice to none and forwards a selected effect", () => {

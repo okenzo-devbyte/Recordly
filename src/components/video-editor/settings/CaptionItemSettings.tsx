@@ -6,6 +6,7 @@ import { useSettingsTranslations } from "./useSettingsTranslations";
 export const captionItemSettingsKeys = [
 	"autoCaptions",
 	"captionCurrentTimeMs",
+	"getCaptionCurrentTimeMs",
 	"selectedCaptionId",
 	"onBeginCaptionEdit",
 	"onCaptionTextEdit",
@@ -19,6 +20,7 @@ export function CaptionItemSettings(props: Props) {
 	const {
 		autoCaptions,
 		captionCurrentTimeMs,
+		getCaptionCurrentTimeMs,
 		selectedCaptionId,
 		onBeginCaptionEdit,
 		onCaptionTextEdit,
@@ -36,6 +38,7 @@ export function CaptionItemSettings(props: Props) {
 					cues={autoCaptions}
 					selectedCaptionId={selectedCaptionId}
 					currentTimeMs={captionCurrentTimeMs}
+					getCurrentTimeMs={getCaptionCurrentTimeMs}
 					onBeginCaptionEdit={(id) => onBeginCaptionEdit?.(id)}
 					onCaptionTextEdit={(id, text) => onCaptionTextEdit?.(id, text)}
 					onCaptionRetime={(id, span) => onCaptionRetime?.(id, span)}

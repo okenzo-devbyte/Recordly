@@ -20,7 +20,7 @@ import {
 type Input = {
 	timeline: ReturnType<typeof useTimelineState>;
 	duration: number;
-	currentTime: number;
+	currentTime?: number;
 	nextClipIdRef: MutableRefObject<number>;
 	initializedRef: MutableRefObject<boolean>;
 	autoFullTrackIdRef: MutableRefObject<string | null>;
@@ -30,7 +30,7 @@ type Input = {
 export function useTimelineProjection({
 	timeline,
 	duration,
-	currentTime,
+	currentTime = 0,
 	nextClipIdRef,
 	initializedRef,
 	autoFullTrackIdRef,

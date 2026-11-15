@@ -6,6 +6,7 @@ import {
 } from "./backendPolicy";
 import { requiresClipTimelineRendering } from "./clipTimeline";
 import { getExportBackpressureProfile } from "./exportTuning";
+import { getPerformanceBudgetSnapshot } from "@/lib/performanceProfileStore";
 import type { ModernExportAttempt, ModernExportFramePlan } from "./modernExportAttemptTypes";
 import { getNowMs, NATIVE_EXPORT_ENGINE_NAME } from "./modernExportConstants";
 import type { ModernExportHooks } from "./modernExportHooks";
@@ -154,12 +155,16 @@ export async function prepareExportAttempt(
 		}
 	}
 
+	const performanceBudget = getPerformanceBudgetSnapshot();
 	session.backpressureProfile = getExportBackpressureProfile({
 		encodeBackend: shouldDeferNativeEncoderStart || useNativeEncoder ? "ffmpeg" : "webcodecs",
 		width: session.config.width,
 		height: session.config.height,
 		frameRate: session.config.frameRate,
 		encodingMode: session.config.encodingMode,
+		hardwareConcurrency: performanceBudget.hardware?.logicalProcessors,
+		deviceMemoryGb: performanceBudget.hardware?.totalMemoryGb,
+		allowLowMemoryProfile: performanceBudget.export.allowLowMemoryProfile,
 	});
 	session.flow.maxNativeWriteInFlight = useNativeEncoder
 		? Math.max(
@@ -273,6 +278,9 @@ export async function prepareExportAttempt(
 				height: session.config.height,
 				frameRate: session.config.frameRate,
 				encodingMode: session.config.encodingMode,
+				hardwareConcurrency: performanceBudget.hardware?.logicalProcessors,
+				deviceMemoryGb: performanceBudget.hardware?.totalMemoryGb,
+				allowLowMemoryProfile: performanceBudget.export.allowLowMemoryProfile,
 			});
 			session.flow.maxNativeWriteInFlight = 1;
 			await hooks.initializeEncoder();

@@ -11,6 +11,11 @@ export function shouldForceLinuxEgl(env: NodeJS.ProcessEnv): boolean {
 	return requested === "1" || requested === "true";
 }
 
+export function shouldEnableLinuxVaapi(env: NodeJS.ProcessEnv): boolean {
+	const requested = env.RECORDLY_ENABLE_LINUX_VAAPI?.trim().toLowerCase();
+	return requested === "1" || requested === "true";
+}
+
 export function getGpuSwitches(
 	platform: NodeJS.Platform,
 	env: NodeJS.ProcessEnv = process.env,
@@ -30,9 +35,12 @@ export function getGpuSwitches(
 	}
 
 	if (platform === "linux") {
+		const vaapiEnabled = shouldEnableLinuxVaapi(env);
 		return {
 			useGl: shouldForceLinuxEgl(env) ? "egl" : undefined,
-			disableFeatures: ["VaapiVideoDecoder", "VaapiVideoEncoder"],
+			...(vaapiEnabled
+				? {}
+				: { disableFeatures: ["VaapiVideoDecoder", "VaapiVideoEncoder"] }),
 		};
 	}
 

@@ -396,3 +396,80 @@ describe("source preview seek completion", () => {
 		expect(audio.play).not.toHaveBeenCalled();
 	});
 });
+
+describe("playbackClock synchronization", () => {
+	it("syncs source audio discontinuities directly from playbackClock updates without re-rendering", async () => {
+		const { createPlaybackClockStore } = await import("../state/playbackClockStore");
+		const seeks: number[] = [];
+		let position = 0;
+		const audio = {
+			src: "",
+			dataset: {},
+			duration: 30,
+			playbackRate: 1,
+			paused: false,
+			seeking: false,
+			volume: 1,
+			get currentTime() {
+				return position;
+			},
+			set currentTime(time: number) {
+				position = time;
+				seeks.push(time);
+			},
+			load: vi.fn(),
+			addEventListener: vi.fn(),
+			removeEventListener: vi.fn(),
+			pause: vi.fn(),
+			play: vi.fn().mockResolvedValue(undefined),
+		};
+		vi.stubGlobal("Audio", function () {
+			return audio;
+		});
+		vi.stubGlobal(
+			"AudioContext",
+			class {
+				state = "running";
+				destination = {};
+				close = vi.fn().mockResolvedValue(undefined);
+				createGain() {
+					return { gain: { value: 1 }, connect: vi.fn(), disconnect: vi.fn() };
+				}
+			},
+		);
+
+		const playbackClock = createPlaybackClockStore(0, 0);
+		useAudioPreviewSync({
+			audioRegions: [],
+			previewVolume: 1,
+			isPlaying: true,
+			playbackClock,
+			currentTime: 0,
+			timelineTime: 0,
+			duration: 30,
+			sourcePlaybackRate: 1,
+			previewSourceAudioFallbackPaths: ["/audio.system.wav"],
+			sourceAudioFallbackStartDelayMsByPath: { "/audio.system.wav": 0 },
+			sourceAudioResourceVersion: 0,
+			isCurrentClipMuted: false,
+			getSourceTrackPreviewGain: () => 1,
+			onSourceFallbackLoadError: vi.fn(),
+		});
+
+		const cleanups = harness.effects.map((effect) => effect());
+		await Promise.resolve();
+		harness.effects.at(-1)?.();
+		seeks.length = 0;
+
+		// Updating playbackClock directly without re-rendering syncs source discontinuity.
+		playbackClock.setTime(0.93, 8);
+		expect(seeks).toEqual([8]);
+
+		for (const cleanup of cleanups) {
+			if (typeof cleanup === "function") cleanup();
+		}
+		playbackClock.setTime(1.5, 14);
+		expect(seeks).toEqual([8]);
+	});
+});
+
